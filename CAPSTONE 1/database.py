@@ -2,15 +2,20 @@ import os
 import psycopg2
 
 def get_db():
-    # 1. First choice: Check if Render already provided the system variable
+    # 1. Check if Render already provided the production/internal variable
     db_url = os.environ.get('DATABASE_URL')
     
-    # 2. If it's missing (running locally), force-inject your verified Oregon External URL
+    # 2. Fallback for your local machine using an environment variable
     if not db_url:
-        db_url = "postgresql://test_database_sms_user:D2pQimfuK8nAOFKkw8a4qCjjLTuNjcDY@dpg-d93s1otckfvc739413c0-a.oregon-postgres.render.com/test_database_sms?sslmode=require"
+        # Instead of pasting your password here, look for a LOCAL variable
+        db_url = os.environ.get('LOCAL_DATABASE_URL')
         
-    # 3. If running locally with an environment fallback string, ensure SSL mode is active
-    if "oregon-postgres.render.com" in db_url and "?sslmode=require" not in db_url:
+    # 3. Ultimate fallback if absolutely nothing is configured (Keeps the app from crashing)
+    if not db_url:
+        raise ValueError("Database connection URL not found. Please set DATABASE_URL or LOCAL_DATABASE_URL.")
+        
+    # 4. Enforce SSL mode for cloud hosting security
+    if "postgres.render.com" in db_url and "?sslmode=require" not in db_url:
         db_url += "?sslmode=require"
         
     return psycopg2.connect(db_url)
