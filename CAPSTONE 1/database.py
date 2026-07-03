@@ -1,24 +1,18 @@
 import os
 import psycopg2
+from psycopg2.extras import RealDictCursor
 
 def get_db():
-    # 1. Check if Render already provided the production/internal variable
     db_url = os.environ.get('DATABASE_URL')
-    
-    # 2. Fallback for your local machine using an environment variable
     if not db_url:
-        # Instead of pasting your password here, look for a LOCAL variable
         db_url = os.environ.get('LOCAL_DATABASE_URL')
-        
-    # 3. Ultimate fallback if absolutely nothing is configured (Keeps the app from crashing)
     if not db_url:
-        raise ValueError("Database connection URL not found. Please set DATABASE_URL or LOCAL_DATABASE_URL.")
+        raise ValueError("Database URL not found.")
         
-    # 4. Enforce SSL mode for cloud hosting security
     if "postgres.render.com" in db_url and "?sslmode=require" not in db_url:
         db_url += "?sslmode=require"
         
-    return psycopg2.connect(db_url)
+    return psycopg2.connect(db_url, cursor_factory=RealDictCursor)
 
 def init_db():
     conn = get_db()
