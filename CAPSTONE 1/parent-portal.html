@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Portal | VMC Attendance System</title>
+    <meta name="description"
+        content="Parent Portal – View your child's attendance records including Time In and Time Out.">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+
+<body data-page="parent-portal">
+
+    <!-- Top Navbar -->
+    <nav class="top-navbar">
+        <div class="brand">
+            <div class="brand-icon">🎓</div>
+            <span>VMC Parent Portal</span>
+        </div>
+        <div class="nav-right">
+            <span class="live-clock" id="liveClock">--:--:-- --</span>
+            <a href="index.html" class="btn btn-outline btn-sm">🚪 Logout</a>
+        </div>
+    </nav>
+
+    <main style="max-width: 900px; margin: 0 auto; padding: 32px 20px; position: relative; z-index: 1;">
+        <!-- Parent Info Card -->
+        <div class="glass-card" style="margin-bottom: 28px;">
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div id="parentPortalAvatar"
+                    style="width: 60px; height: 60px; background: var(--accent-gradient); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; color: white;">
+                    PC
+                </div>
+                <div>
+                    <h2 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px;" id="parentPortalName">Parent
+                        Portal</h2>
+                    <p class="text-secondary" style="font-size: 0.85rem;" id="parentPortalDetails">Loading parent
+                        information...</p>
+                </div>
+            </div>
+        </div>
+
+        <h2 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 20px;">📚 Enrolled Children – Attendance History
+        </h2>
+
+        <div id="childrenContainer">
+            <!-- Populated by JS -->
+            <div class="child-card">
+                <div class="text-center text-muted" style="padding: 20px;">Loading attendance records...</div>
+            </div>
+        </div>
+    </main>
+
+    <script src="assets/js/script.js?v=2"></script>
+</body>
+
+</html>

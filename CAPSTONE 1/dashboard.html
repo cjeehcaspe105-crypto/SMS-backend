@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | VMC Attendance System</title>
+    <meta name="description"
+        content="VMC Admin Dashboard – Monitor student attendance, SMS notifications, and RFID scans in real time.">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+
+<body data-page="dashboard">
+
+    <!-- Top Navbar -->
+    <nav class="top-navbar">
+        <div class="brand">
+            <div class="brand-icon">🎓</div>
+            <span>VMC Attendance</span>
+        </div>
+        <div class="nav-right">
+            <span class="live-clock" id="liveClock">--:--:-- --</span>
+            <div class="admin-badge">
+                <div class="avatar">A</div>
+                <span>Administrator</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <p class="nav-section-title">Navigation</p>
+            <ul class="nav-items">
+                <li class="nav-item">
+                    <a href="dashboard.html" class="active">
+                        <span class="nav-icon">📊</span> Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="rfid.html">
+                        <span class="nav-icon">📡</span> RFID Scanner
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="attendance.html">
+                        <span class="nav-icon">📋</span> Attendance Records
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="students.html">
+                        <span class="nav-icon">👨‍🎓</span> Students
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="sms.html">
+                        <span class="nav-icon">💬</span> SMS Notifications
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="settings.html">
+                        <span class="nav-icon">⚙️</span> Settings
+                    </a>
+                </li>
+            </ul>
+            <div class="nav-footer">
+                <div class="nav-item">
+                    <a href="#" onclick="logout(); return false;">
+                        <span class="nav-icon">🚪</span> Logout
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1>Dashboard Overview</h1>
+                    <p class="page-subtitle">Real-time attendance and SMS monitoring</p>
+                </div>
+                <a href="rfid.html" class="btn btn-primary">📡 Open RFID Scanner</a>
+            </div>
+
+            <!-- Stat Cards -->
+            <div class="grid-4 stagger">
+                <div class="stat-card purple">
+                    <div class="stat-icon">👨‍🎓</div>
+                    <div class="stat-label">Total Students</div>
+                    <div class="stat-value" id="statTotalStudents">0</div>
+                </div>
+                <div class="stat-card green">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-label">Present Today</div>
+                    <div class="stat-value" id="statPresent">0</div>
+                </div>
+                <div class="stat-card red">
+                    <div class="stat-icon">❌</div>
+                    <div class="stat-label">Absent Today</div>
+                    <div class="stat-value" id="statAbsent">0</div>
+                </div>
+                <div class="stat-card blue">
+                    <div class="stat-icon">💬</div>
+                    <div class="stat-label">SMS Sent Today</div>
+                    <div class="stat-value" id="statSmsSent">0</div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div style="margin-top: 32px;">
+                <h2 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 16px;">Quick Actions</h2>
+                <div class="grid-4 stagger">
+                    <a href="rfid.html" class="quick-action">
+                        <div class="qa-icon" style="background: rgba(108,99,255,0.15);">📡</div>
+                        <span class="qa-label">Scan RFID</span>
+                    </a>
+                    <a href="students.html" class="quick-action">
+                        <div class="qa-icon" style="background: rgba(16,185,129,0.15);">➕</div>
+                        <span class="qa-label">Manage Students</span>
+                    </a>
+                    <a href="attendance.html" class="quick-action">
+                        <div class="qa-icon" style="background: rgba(245,158,11,0.15);">📋</div>
+                        <span class="qa-label">View Attendance</span>
+                    </a>
+                    <a href="sms.html" class="quick-action">
+                        <div class="qa-icon" style="background: rgba(59,130,246,0.15);">💬</div>
+                        <span class="qa-label">SMS Logs</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Two Column: Grade Level Breakdown + Recent Activity -->
+            <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 24px; margin-top: 32px;">
+                <!-- Attendance by Grade Level -->
+                <div class="glass-card">
+                    <h2 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 4px;">Attendance by Grade Level</h2>
+                    <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 16px;">Junior High School</p>
+                    <div style="width: 100%; height: 250px;">
+                        <canvas id="attendanceChart"></canvas>
+                    </div>
+                    <div class="grade-cards" id="gradeCards" style="margin-top: 16px;">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Recent Activity Feed -->
+                <div class="glass-card">
+                    <h2 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 16px;">Recent Activity</h2>
+                    <ul class="activity-feed" id="recentActivity">
+                        <!-- Populated by JS -->
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="assets/js/script.js?v=2"></script>
+</body>
+
+</html>
