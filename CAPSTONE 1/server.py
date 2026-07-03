@@ -37,8 +37,8 @@ def login():
     c.close() # Good job closing your cursor
     conn.close()
 
-    # admin[2] reads the password column index from your tuple (id=0, username=1, password=2)
-    if admin and admin[2] == data.get('password'):
+# admin['password'] reads the password column directly by its name from your dictionary
+    if admin and admin['password'] == data.get('password'):
         return jsonify({"success": True, "token": "dummy-token-123", "role": "admin"})
         
     return jsonify({"success": False, "message": "Invalid credentials"}), 401
