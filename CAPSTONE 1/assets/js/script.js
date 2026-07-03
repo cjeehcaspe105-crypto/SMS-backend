@@ -5,7 +5,7 @@
             Students, SMS Notifications, Settings
    ========================================================== */
 
-const API = 'https://test-system.onrender.com/api';
+const API = '/api';
 
 /* ─────────────────────────────────────────────────────────
    UTILITY: Toast Notifications
