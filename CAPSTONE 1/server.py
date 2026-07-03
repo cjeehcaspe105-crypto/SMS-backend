@@ -105,41 +105,56 @@ def update_student(id):
     data = request.json
     conn = get_db()
     c = conn.cursor()
+    success = False
+    error_msg = None
     try:
+        # Use %s instead of ? for PostgreSQL
         c.execute('''
-            UPDATE students SET rfid=?, name=?, grade=?, section=?, parent_name=?, parent_contact=?
-            WHERE id=?
-        ''', (data['rfid'], data['name'], data['grade'], data['section'], data['parentName'], data['parentContact'], id))
+            UPDATE students 
+            SET rfid=%s, name=%s, grade=%s, section=%s, parent_name=%s, parent_contact=%s 
+            WHERE id=%s
+        ''', (
+            data.get('rfid'), 
+            data.get('name'), 
+            data.get('grade'), 
+            data.get('section'), 
+            data.get('parentName'), 
+            data.get('parentContact'), 
+            id
+        ))
         conn.commit()
         success = True
-        error_msg = None
     except Exception as e:
         success = False
         error_msg = str(e)
+        print(f"Error updating student: {e}")
     finally:
         conn.close()
+        
     if not success:
         return jsonify({"success": False, "error": error_msg}), 400
     return jsonify({"success": True})
 
-@app.route('/api/students/<id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/students/<id>', methods=['DELETE'])
 def delete_student(id):
-    if request.method == 'OPTIONS':
-        return jsonify({"success": True})
-    print(f"DELETE STUDENT HIT FOR ID: {id}")
+    conn = get_db()
+    c = conn.cursor()
+    success = False
+    error_msg = None
+    
     try:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute('DELETE FROM students WHERE id=?', (id,))
-        # Also cascade delete
-        c.execute('DELETE FROM attendance WHERE student_id=?', (id,))
-        c.execute('DELETE FROM sms_logs WHERE student_id=?', (id,))
+        c.execute("DELETE FROM students WHERE id = %s", (id,))
         conn.commit()
+        success = True
     except Exception as e:
-        print(f"Error deleting: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        success = False
+        error_msg = str(e)
+        print(f"Error deleting student: {e}")
     finally:
         conn.close()
+        
+    if not success:
+        return jsonify({"success": False, "error": error_msg}), 500
     return jsonify({"success": True})
 
 @app.route('/api/students/seed', methods=['POST'])
