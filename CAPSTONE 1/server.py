@@ -30,14 +30,16 @@ def login():
     data = request.json
     conn = get_db()
     c = conn.cursor()
-    c.execute('SELECT * FROM admin WHERE username=?', (data.get('username'),))
+    c.execute('SELECT * FROM admin WHERE username=%s', (data.get('username'),))
     admin = c.fetchone()
+    c.close() # Good job closing your cursor
     conn.close()
-    
-    if admin and admin['password'] == data.get('password'):
-        return jsonify({"success": True, "token": "dummy-token-123", "role": "admin"})
-    return jsonify({"success": False, "message": "Invalid credentials"}), 401
 
+    # admin[2] reads the password column index from your tuple (id=0, username=1, password=2)
+    if admin and admin[2] == data.get('password'):
+        return jsonify({"success": True, "token": "dummy-token-123", "role": "admin"})
+        
+    return jsonify({"success": False, "message": "Invalid credentials"}), 401
 # --- STUDENTS API ---
 @app.route('/api/students', methods=['GET'])
 def get_students():
@@ -243,7 +245,10 @@ def update_settings():
     conn = get_db()
     c = conn.cursor()
     for k, v in data.items():
-        c.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (k, str(v)))
+        c.execute('''
+    INSERT INTO settings (key, value) VALUES (%s, %s)
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+''', (k, str(v)))
     conn.commit()
     conn.close()
     return jsonify({"success": True})
@@ -253,7 +258,7 @@ def change_password():
     data = request.json
     conn = get_db()
     c = conn.cursor()
-    c.execute('SELECT password FROM admin WHERE username=?', ('admin',))
+    c.execute('SELECT password FROM admin WHERE username=%s', ('admin',))
     row = c.fetchone()
 
     if row is None:
@@ -266,7 +271,7 @@ def change_password():
         conn.close()
         return jsonify({"success": False, "message": "Current password incorrect"}), 400
 
-    c.execute('UPDATE admin SET password=? WHERE username=?', (data.get('new'), 'admin'))
+    c.execute('UPDATE admin SET password=%s WHERE username=%s', (data.get('new'), 'admin'))
     conn.commit()
     conn.close()
     return jsonify({"success": True})
