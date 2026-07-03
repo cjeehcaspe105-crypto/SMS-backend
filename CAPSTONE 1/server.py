@@ -58,18 +58,35 @@ def get_students():
     return jsonify(students)
 
 @app.route('/api/students', methods=['POST'])
+@app.route('/api/students', methods=['POST'])
 def add_student():
     data = request.json
     if not data:
         return jsonify({"success": False, "error": "No data provided"}), 400
+        
     conn = get_db()
     c = conn.cursor()
     error_msg = None
+    success = False
+    
     try:
+        # Check if RFID already exists using %s placeholder
+        c.execute("SELECT id FROM students WHERE rfid = %s", (data.get('rfid'),))
+        if c.fetchone():
+            return jsonify({"success": False, "error": "RFID already exists."}), 400
+
+        # Insert new student (letting PostgreSQL handle the auto-incrementing ID)
         c.execute('''
-            INSERT INTO students (id, rfid, name, grade, section, parent_name, parent_contact)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (data['id'], data['rfid'], data['name'], data['grade'], data['section'], data['parentName'], data['parentContact']))
+            INSERT INTO students (rfid, name, grade, section, parent_name, parent_contact)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        ''', (
+            data.get('rfid'), 
+            data.get('name'), 
+            data.get('grade'), 
+            data.get('section'), 
+            data.get('parentName'), 
+            data.get('parentContact')
+        ))
         conn.commit()
         success = True
     except Exception as e:
@@ -78,6 +95,7 @@ def add_student():
         print(f"Error adding student: {e}")
     finally:
         conn.close()
+        
     if not success:
         return jsonify({"success": False, "error": error_msg}), 400
     return jsonify({"success": True})
