@@ -13,6 +13,8 @@ CORS(app)
 init_db()
 
 def make_dict(row):
+    if row is None:
+        return {}
     return dict(row)
 
 # Serve Frontend Files
