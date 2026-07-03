@@ -81,14 +81,14 @@ def init_db():
         )
     ''')
 
-    # Seed Admin if not exists (Postgres always uses %s placeholders)
+    # # Seed Admin if not exists (Postgres always uses %s placeholders)
     c.execute('SELECT COUNT(*) FROM admin')
-    if c.fetchone()[0] == 0:
-        c.execute('INSERT INTO admin (username, password) VALUES (%s, %s)', ('admin', 'admin123'))
+    if list(c.fetchone().values())[0] == 0:
+        c.execute("INSERT INTO admin (username, password) VALUES (%s, %s)", ('admin', 'admin123'))
 
-    # Seed default settings if empty
+    # # Seed default settings if empty
     c.execute('SELECT COUNT(*) FROM settings')
-    if c.fetchone()[0] == 0:
+    if list(c.fetchone().values())[0] == 0:
         default_settings = [
             ('adminName', 'System Administrator'),
             ('adminEmail', 'admin@vmc.edu.ph'),
