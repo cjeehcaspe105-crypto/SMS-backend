@@ -52,6 +52,36 @@ def serve_static(path):
     return send_from_directory('.', path)
 
 
+@app.route('/api/debug/db', methods=['GET'])
+def debug_db():
+    conn = get_db()
+    c = conn.cursor()
+    try:
+        # Check if we are running Postgres or SQLite
+        if USE_POSTGRES:
+            c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+            tables = [r[0] for r in c.fetchall()]
+            schemas = {}
+            for t in tables:
+                c.execute(f"SELECT column_name, data_type FROM information_schema.columns WHERE table_name='{t}'")
+                schemas[t] = [dict(name=r[0], type=r[1]) for r in c.fetchall()]
+            return jsonify({"backend": "PostgreSQL", "tables": tables, "schemas": schemas})
+        else:
+            c.execute("SELECT name, sql FROM sqlite_master WHERE type='table'")
+            tables = [dict(r) for r in c.fetchall()]
+            # Also get row counts for debugging
+            counts = {}
+            for t in tables:
+                name = t['name']
+                c.execute(f"SELECT COUNT(*) FROM {name}")
+                counts[name] = c.fetchone()[0]
+            return jsonify({"backend": "SQLite", "tables": tables, "counts": counts})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
 # ── AUTH API ──────────────────────────────────────────────────────────────────
 
 @app.route('/api/login', methods=['POST'])
