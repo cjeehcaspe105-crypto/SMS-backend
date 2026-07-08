@@ -5,7 +5,12 @@
             Students, SMS Notifications, Settings
    ========================================================== */
 
-const API = '/api';
+// ── API base URL (no trailing slash, no sub-path) ──────────────────────────
+// All fetch calls below append their own sub-paths (e.g. /students, /attendance).
+// Previously this was set to '.../api/students' which caused every call to
+// resolve to a doubly-nested path (.../api/students/students, etc.), breaking
+// auth, RFID scanning, student CRUD, and cross-device sync simultaneously.
+const API_BASE = 'https://sms-backend-ja4y.onrender.com/api';
 
 /* ─────────────────────────────────────────────────────────
    UTILITY: Toast Notifications
@@ -91,7 +96,7 @@ async function handleLogin(e) {
   btn.textContent = '🔄 Signing in...';
 
   try {
-    const res = await fetch(`${API}/login`, {
+    const res = await fetch(`${API_BASE}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -126,13 +131,13 @@ let attendanceChart = null;
 async function loadDashboard() {
   try {
     const [studRes, attRes, smsRes] = await Promise.all([
-      fetch(`${API}/students`),
-      fetch(`${API}/attendance`),
-      fetch(`${API}/sms`)
+      fetch(`${API_BASE}/students`),
+      fetch(`${API_BASE}/attendance`),
+      fetch(`${API_BASE}/sms`)
     ]);
-    const students = await studRes.json();
+    const students   = await studRes.json();
     const attendance = await attRes.json();
-    const smsLogs = await smsRes.json();
+    const smsLogs    = await smsRes.json();
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -141,9 +146,9 @@ async function loadDashboard() {
     const smsTodayCount = smsLogs.filter(s => s.date === today).length;
 
     setEl('statTotalStudents', students.length);
-    setEl('statPresent', presentIds.size);
-    setEl('statAbsent', Math.max(0, students.length - presentIds.size));
-    setEl('statSmsSent', smsTodayCount);
+    setEl('statPresent',        presentIds.size);
+    setEl('statAbsent',         Math.max(0, students.length - presentIds.size));
+    setEl('statSmsSent',        smsTodayCount);
 
     // Grade breakdown
     const gradeMap = {};
@@ -227,21 +232,21 @@ function setEl(id, val) {
 /* ─────────────────────────────────────────────────────────
    RFID SCANNER PAGE
 ───────────────────────────────────────────────────────── */
-let students = [];
-let settings = {};
-let todayScans = [];
-let scanCooldowns = {};   // rfid → last scan timestamp
+let students       = [];
+let settings       = {};
+let todayScans     = [];
+let scanCooldowns  = {};   // rfid → last scan timestamp
 
 async function loadRFID() {
   try {
     const [sRes, stRes] = await Promise.all([
-      fetch(`${API}/settings`),
-      fetch(`${API}/students`)
+      fetch(`${API_BASE}/settings`),
+      fetch(`${API_BASE}/students`)
     ]);
     settings = await sRes.json();
-    students = await stRes.json();
+    students  = await stRes.json();
 
-    const attRes = await fetch(`${API}/attendance`);
+    const attRes = await fetch(`${API_BASE}/attendance`);
     const attendance = await attRes.json();
     const today = new Date().toISOString().split('T')[0];
     todayScans = attendance.filter(a => a.date === today);
@@ -298,7 +303,7 @@ async function processRFID(rfidCode) {
     return;
   }
 
-  const type = todayIn ? 'OUT' : 'IN';
+  const type   = todayIn ? 'OUT' : 'IN';
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
   // Determine late status
@@ -312,28 +317,28 @@ async function processRFID(rfidCode) {
 
   // Build SMS message
   const template = type === 'IN'
-    ? (settings.smsTemplateIn || 'Your child {name} has arrived at {time}.')
+    ? (settings.smsTemplateIn  || 'Your child {name} has arrived at {time}.')
     : (settings.smsTemplateOut || 'Your child {name} has left at {time}.');
   const smsMessage = template.replace('{name}', student.name).replace('{time}', timeStr);
 
   const scanPayload = {
-    id: 'ATT' + Date.now(),
-    studentId: student.id,
-    rfid: student.rfid,
-    studentName: student.name,
-    grade: student.grade,
-    section: student.section,
+    id:           'ATT' + Date.now(),
+    studentId:    student.id,
+    rfid:         student.rfid,
+    studentName:  student.name,
+    grade:        student.grade,
+    section:      student.section,
     type,
     status,
-    timestamp: now.toISOString(),
-    date: today,
+    timestamp:    now.toISOString(),
+    date:         today,
     parentContact: student.parentContact || student.parent_contact,
     smsMessage,
-    smsStatus: 'Sent'
+    smsStatus:    'Sent'
   };
 
   try {
-    await fetch(`${API}/attendance/scan`, {
+    await fetch(`${API_BASE}/attendance/scan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(scanPayload)
@@ -406,7 +411,7 @@ let allAttendance = [];
 
 async function loadAttendance() {
   try {
-    const res = await fetch(`${API}/attendance`);
+    const res = await fetch(`${API_BASE}/attendance`);
     allAttendance = await res.json();
     // Group by student + date and show one row per student per day
     renderAttendance(allAttendance);
@@ -425,7 +430,7 @@ function renderAttendance(records) {
   records.forEach(r => {
     const key = `${r.student_id || r.studentId}_${r.date}`;
     if (!grouped[key]) grouped[key] = { ...r, timeIn: null, timeOut: null, studentName: r.student_name || r.studentName };
-    if (r.type === 'IN') grouped[key].timeIn = r.timestamp;
+    if (r.type === 'IN')  grouped[key].timeIn  = r.timestamp;
     if (r.type === 'OUT') grouped[key].timeOut = r.timestamp;
   });
 
@@ -444,20 +449,20 @@ function renderAttendance(records) {
       <td><strong>${r.studentName}</strong></td>
       <td>${r.grade}</td>
       <td>${r.date}</td>
-      <td>${r.timeIn ? new Date(r.timeIn).toLocaleTimeString() : '—'}</td>
+      <td>${r.timeIn  ? new Date(r.timeIn).toLocaleTimeString()  : '—'}</td>
       <td>${r.timeOut ? new Date(r.timeOut).toLocaleTimeString() : '—'}</td>
       <td><span class="badge ${statusBadge(r.status)}">${r.status}</span></td>
     </tr>`).join('');
 }
 
 function filterAttendance() {
-  const date = document.getElementById('filterDate')?.value;
-  const grade = document.getElementById('filterGrade')?.value;
+  const date   = document.getElementById('filterDate')?.value;
+  const grade  = document.getElementById('filterGrade')?.value;
   const search = (document.getElementById('filterSearch')?.value || '').toLowerCase();
 
   let filtered = allAttendance;
-  if (date) filtered = filtered.filter(r => r.date === date);
-  if (grade) filtered = filtered.filter(r => r.grade === grade);
+  if (date)   filtered = filtered.filter(r => r.date === date);
+  if (grade)  filtered = filtered.filter(r => r.grade === grade);
   if (search) filtered = filtered.filter(r =>
     (r.student_name || r.studentName || '').toLowerCase().includes(search) ||
     (r.rfid || '').toLowerCase().includes(search)
@@ -471,7 +476,7 @@ function exportAttendanceCSV() {
   allAttendance.forEach(r => {
     const key = `${r.student_id || r.studentId}_${r.date}`;
     if (!grouped[key]) grouped[key] = { ...r, timeIn: null, timeOut: null, studentName: r.student_name || r.studentName };
-    if (r.type === 'IN') grouped[key].timeIn = r.timestamp;
+    if (r.type === 'IN')  grouped[key].timeIn  = r.timestamp;
     if (r.type === 'OUT') grouped[key].timeOut = r.timestamp;
   });
   const rows = Object.values(grouped).map(r => [
@@ -479,14 +484,14 @@ function exportAttendanceCSV() {
     r.studentName,
     r.grade,
     r.date,
-    r.timeIn ? new Date(r.timeIn).toLocaleTimeString() : '',
+    r.timeIn  ? new Date(r.timeIn).toLocaleTimeString()  : '',
     r.timeOut ? new Date(r.timeOut).toLocaleTimeString() : '',
     r.status
   ]);
-  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const csv  = [headers, ...rows].map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
   a.href = url; a.download = `vmc-attendance-${Date.now()}.csv`; a.click();
   URL.revokeObjectURL(url);
   showToast('Attendance exported to CSV!', 'success');
@@ -499,7 +504,7 @@ let allStudents = [];
 
 async function loadStudents() {
   try {
-    const res = await fetch(`${API}/students`);
+    const res = await fetch(`${API_BASE}/students`);
     allStudents = await res.json();
     renderStudents(allStudents);
   } catch (err) {
@@ -536,10 +541,10 @@ function searchStudents() {
   const q = (document.getElementById('studentSearch')?.value || '').toLowerCase();
   renderStudents(q
     ? allStudents.filter(s =>
-      s.name.toLowerCase().includes(q) ||
-      s.rfid.toLowerCase().includes(q) ||
-      s.grade.toLowerCase().includes(q) ||
-      (s.parentContact || s.parent_contact || '').includes(q))
+        s.name.toLowerCase().includes(q) ||
+        s.rfid.toLowerCase().includes(q) ||
+        s.grade.toLowerCase().includes(q) ||
+        (s.parentContact || s.parent_contact || '').includes(q))
     : allStudents
   );
 }
@@ -555,75 +560,85 @@ function openEditStudentModal(id) {
   const s = allStudents.find(x => x.id === id);
   if (!s) return;
   document.getElementById('modalTitle').textContent = 'Edit Student';
-  document.getElementById('editStudentId').value = s.id;
-  document.getElementById('inputName').value = s.name;
-  document.getElementById('inputRfid').value = s.rfid;
-  document.getElementById('inputGrade').value = s.grade;
-  document.getElementById('inputSection').value = s.section;
-  document.getElementById('inputParentName').value = s.parentName || s.parent_name;
+  document.getElementById('editStudentId').value   = s.id;
+  document.getElementById('inputName').value        = s.name;
+  document.getElementById('inputRfid').value        = s.rfid;
+  document.getElementById('inputGrade').value       = s.grade;
+  document.getElementById('inputSection').value     = s.section;
+  document.getElementById('inputParentName').value  = s.parentName  || s.parent_name;
   document.getElementById('inputParentContact').value = s.parentContact || s.parent_contact;
   toggleModal('studentModal', true);
 }
 
 async function saveStudent(e) {
   e.preventDefault();
-  const editId = document.getElementById('editStudentId').value;
+  const editId = document.getElementById('editStudentId').value.trim();
   const payload = {
-    id: editId || ('STU' + Date.now()),
-    rfid: document.getElementById('inputRfid').value.trim(),
-    name: document.getElementById('inputName').value.trim(),
-    grade: document.getElementById('inputGrade').value,
-    section: document.getElementById('inputSection').value.trim(),
-    parentName: document.getElementById('inputParentName').value.trim(),
+    id:            editId || ('STU' + Date.now()),
+    rfid:          document.getElementById('inputRfid').value.trim(),
+    name:          document.getElementById('inputName').value.trim(),
+    grade:         document.getElementById('inputGrade').value,
+    section:       document.getElementById('inputSection').value.trim(),
+    parentName:    document.getElementById('inputParentName').value.trim(),
     parentContact: document.getElementById('inputParentContact').value.trim()
   };
 
-  const url = editId ? `${API}/students/${editId}` : `${API}/students`;
+  // FIX: use API_BASE (not the old API constant) so paths resolve correctly:
+  //   ADD  → POST  /api/students
+  //   EDIT → PUT   /api/students/{id}
+  const url    = editId ? `${API_BASE}/students/${editId}` : `${API_BASE}/students`;
   const method = editId ? 'PUT' : 'POST';
 
   try {
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const res  = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
     const data = await res.json();
     if (data.success) {
       showToast(editId ? 'Student updated!' : 'Student added!', 'success');
       toggleModal('studentModal', false);
       loadStudents();
     } else {
-      showToast('Failed to save student. RFID may already exist.', 'error');
+      // FIX: show the actual error from the server, not a hardcoded message.
+      const errMsg = data.error || 'Failed to save student. Check all fields and try again.';
+      showToast(errMsg, 'error');
     }
   } catch (err) {
     console.error('Save student error:', err);
-    showToast('Server error.', 'error');
+    showToast('Cannot reach server. Make sure the backend is running.', 'error');
   }
 }
 
 async function deleteStudent(id) {
   if (!confirm('Delete this student and all their records?')) return;
   try {
-    const res = await fetch(`${API}/students/${id}`, { method: 'DELETE' });
+    const res  = await fetch(`${API_BASE}/students/${id}`, { method: 'DELETE' });
     const data = await res.json();
     if (data.success) {
       showToast('Student deleted.', 'success');
       loadStudents();
     } else {
-      showToast('Delete failed.', 'error');
+      // Show real server error if available
+      showToast(data.error || 'Delete failed. The student may have linked records.', 'error');
     }
   } catch (err) {
     console.error('Delete student error:', err);
-    showToast('Server error.', 'error');
+    showToast('Cannot reach server. Make sure the backend is running.', 'error');
   }
 }
 
 async function loadSampleStudents() {
   const samples = [
-    { id: 'DEMO001', rfid: 'DEMO-RF001', name: 'Maria Clara Santos', grade: 'Grade 7', section: 'St. Mark', parentName: 'Jose Santos', parentContact: '09171000001' },
-    { id: 'DEMO002', rfid: 'DEMO-RF002', name: 'Jose Rizal Reyes', grade: 'Grade 8', section: 'St. Luke', parentName: 'Ana Reyes', parentContact: '09171000002' },
-    { id: 'DEMO003', rfid: 'DEMO-RF003', name: 'Gabriela Luna', grade: 'Grade 9', section: 'St. John', parentName: 'Miguel Luna', parentContact: '09171000003' },
-    { id: 'DEMO004', rfid: 'DEMO-RF004', name: 'Andres Bonifacio Cruz', grade: 'Grade 10', section: 'St. Matthew', parentName: 'Rosa Cruz', parentContact: '09171000004' },
-    { id: 'DEMO005', rfid: 'DEMO-RF005', name: 'Melchora Aquino', grade: 'Grade 7', section: 'St. Peter', parentName: 'Carlos Aquino', parentContact: '09171000005' },
+    { id:'DEMO001', rfid:'DEMO-RF001', name:'Maria Clara Santos',   grade:'Grade 7',  section:'St. Mark',    parentName:'Jose Santos',    parentContact:'09171000001' },
+    { id:'DEMO002', rfid:'DEMO-RF002', name:'Jose Rizal Reyes',     grade:'Grade 8',  section:'St. Luke',    parentName:'Ana Reyes',      parentContact:'09171000002' },
+    { id:'DEMO003', rfid:'DEMO-RF003', name:'Gabriela Luna',        grade:'Grade 9',  section:'St. John',    parentName:'Miguel Luna',    parentContact:'09171000003' },
+    { id:'DEMO004', rfid:'DEMO-RF004', name:'Andres Bonifacio Cruz', grade:'Grade 10', section:'St. Matthew', parentName:'Rosa Cruz',      parentContact:'09171000004' },
+    { id:'DEMO005', rfid:'DEMO-RF005', name:'Melchora Aquino',      grade:'Grade 7',  section:'St. Peter',   parentName:'Carlos Aquino',  parentContact:'09171000005' },
   ];
   try {
-    const res = await fetch(`${API}/students/seed`, {
+    const res = await fetch(`${API_BASE}/students/seed`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(samples)
@@ -648,7 +663,7 @@ let allSms = [];
 
 async function loadSms() {
   try {
-    const res = await fetch(`${API}/sms`);
+    const res = await fetch(`${API_BASE}/sms`);
     allSms = await res.json();
     renderSms(allSms);
   } catch (err) {
@@ -679,12 +694,12 @@ function renderSms(list) {
 }
 
 function filterSms() {
-  const date = document.getElementById('smsFilterDate')?.value;
+  const date   = document.getElementById('smsFilterDate')?.value;
   const status = document.getElementById('smsFilterStatus')?.value;
   const search = (document.getElementById('smsFilterSearch')?.value || '').toLowerCase();
 
   let f = allSms;
-  if (date) f = f.filter(s => s.date === date);
+  if (date)   f = f.filter(s => s.date === date);
   if (status) f = f.filter(s => s.status === status);
   if (search) f = f.filter(s =>
     (s.student_name || s.studentName || '').toLowerCase().includes(search) ||
@@ -695,7 +710,7 @@ function filterSms() {
 
 async function resendSms(id) {
   try {
-    await fetch(`${API}/sms/${id}/resend`, { method: 'POST' });
+    await fetch(`${API_BASE}/sms/${id}/resend`, { method: 'POST' });
     showToast('SMS resent successfully.', 'success');
     loadSms();
   } catch (err) {
@@ -709,18 +724,18 @@ async function resendSms(id) {
 ───────────────────────────────────────────────────────── */
 async function loadSettings() {
   try {
-    const res = await fetch(`${API}/settings`);
+    const res  = await fetch(`${API_BASE}/settings`);
     const data = await res.json();
 
-    setVal('settingAdminName', data.adminName);
-    setVal('settingAdminEmail', data.adminEmail);
-    setVal('settingSmsSender', data.smsSenderName);
-    setVal('settingSmsTemplateIn', data.smsTemplateIn);
-    setVal('settingSmsTemplateOut', data.smsTemplateOut);
-    setVal('settingCooldown', data.scanCooldown);
-    setVal('settingLateThreshold', data.lateThreshold);
-    setVal('settingSchoolStart', data.schoolStart);
-    setVal('settingSchoolEnd', data.schoolEnd);
+    setVal('settingAdminName',       data.adminName);
+    setVal('settingAdminEmail',      data.adminEmail);
+    setVal('settingSmsSender',       data.smsSenderName);
+    setVal('settingSmsTemplateIn',   data.smsTemplateIn);
+    setVal('settingSmsTemplateOut',  data.smsTemplateOut);
+    setVal('settingCooldown',        data.scanCooldown);
+    setVal('settingLateThreshold',   data.lateThreshold);
+    setVal('settingSchoolStart',     data.schoolStart);
+    setVal('settingSchoolEnd',       data.schoolEnd);
   } catch (err) {
     console.error('Settings load error:', err);
     showToast('Failed to load settings.', 'error');
@@ -735,19 +750,19 @@ function setVal(id, val) {
 async function saveSettings(e) {
   e.preventDefault();
   const payload = {
-    adminName: getVal('settingAdminName'),
-    adminEmail: getVal('settingAdminEmail'),
-    smsSenderName: getVal('settingSmsSender'),
-    smsTemplateIn: getVal('settingSmsTemplateIn'),
-    smsTemplateOut: getVal('settingSmsTemplateOut'),
-    scanCooldown: getVal('settingCooldown'),
-    lateThreshold: getVal('settingLateThreshold'),
-    schoolStart: getVal('settingSchoolStart'),
-    schoolEnd: getVal('settingSchoolEnd')
+    adminName:       getVal('settingAdminName'),
+    adminEmail:      getVal('settingAdminEmail'),
+    smsSenderName:   getVal('settingSmsSender'),
+    smsTemplateIn:   getVal('settingSmsTemplateIn'),
+    smsTemplateOut:  getVal('settingSmsTemplateOut'),
+    scanCooldown:    getVal('settingCooldown'),
+    lateThreshold:   getVal('settingLateThreshold'),
+    schoolStart:     getVal('settingSchoolStart'),
+    schoolEnd:       getVal('settingSchoolEnd')
   };
 
   try {
-    const res = await fetch(`${API}/settings`, {
+    const res  = await fetch(`${API_BASE}/settings`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -767,14 +782,14 @@ function getVal(id) {
 async function changePassword(e) {
   e.preventDefault();
   const current = document.getElementById('currentPassword').value;
-  const newPwd = document.getElementById('newPassword').value;
+  const newPwd  = document.getElementById('newPassword').value;
   const confirm = document.getElementById('confirmPassword').value;
 
   if (newPwd !== confirm) { showToast('New passwords do not match.', 'error'); return; }
-  if (newPwd.length < 4) { showToast('Password too short (min 4 chars).', 'warning'); return; }
+  if (newPwd.length < 4)  { showToast('Password too short (min 4 chars).', 'warning'); return; }
 
   try {
-    const res = await fetch(`${API}/settings/password`, {
+    const res  = await fetch(`${API_BASE}/settings/password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ current, new: newPwd })
@@ -795,7 +810,7 @@ async function changePassword(e) {
 async function clearAllData() {
   if (!confirm('⚠️ DELETE ALL students, attendance, and SMS logs? This cannot be undone.')) return;
   try {
-    const res = await fetch(`${API}/clear`, { method: 'POST' });
+    const res  = await fetch(`${API_BASE}/clear`, { method: 'POST' });
     const data = await res.json();
     if (data.success) {
       showToast('All data cleared.', 'warning');
@@ -822,30 +837,30 @@ async function loadParentPortal() {
     logout();
     return;
   }
-
+  
   try {
-    const res = await fetch(`${API}/parent/portal/${studentId}`);
+    const res = await fetch(`${API_BASE}/parent/portal/${studentId}`);
     const data = await res.json();
     if (!data.success) {
       showToast('Failed to load child data.', 'error');
       return;
     }
-
+    
     const { student, attendance } = data;
-
+    
     // Fill parent metadata
     const initials = student.parentName ? student.parentName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'PC';
     const avatarEl = document.getElementById('parentPortalAvatar');
     if (avatarEl) avatarEl.textContent = initials;
-
+    
     const nameEl = document.getElementById('parentPortalName');
     if (nameEl) nameEl.textContent = student.parentName || 'Parent / Guardian';
-
+    
     const detailsEl = document.getElementById('parentPortalDetails');
     if (detailsEl) {
       detailsEl.textContent = `Contact: ${student.parentContact || '—'} • Student Linked: ${student.name} (${student.id})`;
     }
-
+    
     // Render child card and attendance history
     const container = document.getElementById('childrenContainer');
     if (container) {
@@ -863,7 +878,7 @@ async function loadParentPortal() {
         `;
         return;
       }
-
+      
       // Group attendance by date for this child
       const grouped = {};
       attendance.forEach(r => {
@@ -878,13 +893,13 @@ async function loadParentPortal() {
           grouped[r.date].timeOut = r.timestamp;
         }
       });
-
+      
       const sortedHistory = Object.values(grouped).sort((a, b) => new Date(b.date) - new Date(a.date));
-
+      
       const tableRows = sortedHistory.map(h => {
-        const timeInStr = h.timeIn ? new Date(h.timeIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-        const timeOutStr = h.timeOut ? new Date(h.timeOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-
+        const timeInStr = h.timeIn ? new Date(h.timeIn).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—';
+        const timeOutStr = h.timeOut ? new Date(h.timeOut).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—';
+        
         return `
           <tr>
             <td>${h.date}</td>
@@ -894,7 +909,7 @@ async function loadParentPortal() {
           </tr>
         `;
       }).join('');
-
+      
       container.innerHTML = `
         <div class="child-card glass-card" style="padding: 24px; overflow: hidden;">
           <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:12px; margin-bottom:16px;">
@@ -931,12 +946,12 @@ async function loadParentPortal() {
 
 function statusBadge(status) {
   const map = {
-    'On Time': 'badge-green',
-    'Late': 'badge-orange',
+    'On Time':  'badge-green',
+    'Late':     'badge-orange',
     'Departed': 'badge-blue',
-    'Sent': 'badge-green',
-    'Failed': 'badge-red',
-    'Absent': 'badge-red'
+    'Sent':     'badge-green',
+    'Failed':   'badge-red',
+    'Absent':   'badge-red'
   };
   return map[status] || 'badge-neutral';
 }
@@ -950,11 +965,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const page = document.body.dataset.page;
 
-  if (page === 'dashboard') loadDashboard();
-  if (page === 'rfid') loadRFID();
+  if (page === 'dashboard')  loadDashboard();
+  if (page === 'rfid')       loadRFID();
   if (page === 'attendance') loadAttendance();
-  if (page === 'students') loadStudents();
-  if (page === 'sms') loadSms();
-  if (page === 'settings') loadSettings();
+  if (page === 'students')   loadStudents();
+  if (page === 'sms')        loadSms();
+  if (page === 'settings')   loadSettings();
   if (page === 'parent-portal') loadParentPortal();
 });

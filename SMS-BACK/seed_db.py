@@ -1,6 +1,6 @@
 """
 seed_db.py — VMC Attendance System
-Seeds the PostgreSQL database on Render with:
+Seeds the vmc.db SQLite database with:
   - Initialised tables (via database.init_db)
   - 10 sample students (Grade 7-10, multiple sections)
   - 3 sample attendance/scan records per student
@@ -46,14 +46,13 @@ c = conn.cursor()
 inserted_students = 0
 for s in STUDENTS:
     try:
-        # Changed '?' placeholders to '%s' for PostgreSQL
         c.execute(
-            "INSERT INTO students (id, rfid, name, grade, section, parent_name, parent_contact) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            "INSERT INTO students (id, rfid, name, grade, section, parent_name, parent_contact) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (s["id"], s["rfid"], s["name"], s["grade"], s["section"], s["parentName"], s["parentContact"])
         )
         inserted_students += 1
     except Exception:
-        conn.rollback()  # PostgreSQL requires rolling back a failed transaction block before continuing
+        pass  # Skip duplicates silently
 
 conn.commit()
 print(f"[OK] Students seeded: {inserted_students} new records added (duplicates skipped).")
@@ -98,29 +97,26 @@ for date in base_dates:
 inserted_att = 0
 for row in ATTENDANCE:
     try:
-        # Changed '?' placeholders to '%s' for PostgreSQL
         c.execute(
-            "INSERT INTO attendance (id, student_id, rfid, student_name, grade, section, type, status, timestamp, date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            "INSERT INTO attendance (id, student_id, rfid, student_name, grade, section, type, status, timestamp, date) VALUES (?,?,?,?,?,?,?,?,?,?)",
             row
         )
         inserted_att += 1
     except Exception:
-        conn.rollback()
+        pass
 
 inserted_sms = 0
 for row in SMS_LOGS:
     try:
-        # Changed '?' placeholders to '%s' for PostgreSQL
         c.execute(
-            "INSERT INTO sms_logs (id, student_id, student_name, parent_contact, message, type, status, timestamp, date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            "INSERT INTO sms_logs (id, student_id, student_name, parent_contact, message, type, status, timestamp, date) VALUES (?,?,?,?,?,?,?,?,?)",
             row
         )
         inserted_sms += 1
     except Exception:
-        conn.rollback()
+        pass
 
 conn.commit()
-c.close()
 conn.close()
 
 print(f"[OK] Attendance records seeded: {inserted_att} (duplicates skipped).")
@@ -128,5 +124,5 @@ print(f"[OK] SMS log records seeded:    {inserted_sms} (duplicates skipped).")
 print("")
 print("=" * 50)
 print("  Database seeded successfully!")
-print("  Target: Remote PostgreSQL Database on Render")
+print(f"  DB file: {os.path.join(os.path.dirname(os.path.abspath(__file__)), 'vmc.db')}")
 print("=" * 50)

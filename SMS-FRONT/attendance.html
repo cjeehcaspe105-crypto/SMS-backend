@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Records | VMC Attendance System</title>
+    <meta name="description" content="View and filter student attendance records with Time In and Time Out data.">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+
+<body data-page="attendance">
+
+    <!-- Top Navbar -->
+    <nav class="top-navbar">
+        <div class="brand">
+            <div class="brand-icon">🎓</div>
+            <span>VMC Attendance</span>
+        </div>
+        <div class="nav-right">
+            <span class="live-clock" id="liveClock">--:--:-- --</span>
+            <div class="admin-badge">
+                <div class="avatar">A</div>
+                <span>Administrator</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <p class="nav-section-title">Navigation</p>
+            <ul class="nav-items">
+                <li class="nav-item"><a href="dashboard.html"><span class="nav-icon">📊</span> Dashboard</a></li>
+                <li class="nav-item"><a href="rfid.html"><span class="nav-icon">📡</span> RFID Scanner</a></li>
+                <li class="nav-item"><a href="attendance.html" class="active"><span class="nav-icon">📋</span>
+                        Attendance Records</a></li>
+                <li class="nav-item"><a href="students.html"><span class="nav-icon">👨‍🎓</span> Students</a></li>
+                <li class="nav-item"><a href="sms.html"><span class="nav-icon">💬</span> SMS Notifications</a></li>
+                <li class="nav-item"><a href="settings.html"><span class="nav-icon">⚙️</span> Settings</a></li>
+            </ul>
+            <div class="nav-footer">
+                <div class="nav-item"><a href="#" onclick="logout(); return false;"><span class="nav-icon">🚪</span>
+                        Logout</a></div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1>Attendance Records</h1>
+                    <p class="page-subtitle">View Time In, Time Out, and attendance status for all students</p>
+                </div>
+                <button class="btn btn-success" onclick="exportAttendanceCSV()">📥 Export CSV</button>
+            </div>
+
+            <!-- Filters -->
+            <div class="toolbar">
+                <div class="form-group" style="margin-bottom:0; min-width: 160px;">
+                    <input type="date" id="filterDate" class="form-control" onchange="filterAttendance()">
+                </div>
+                <div class="form-group" style="margin-bottom:0; min-width: 140px;">
+                    <select id="filterGrade" class="form-control" onchange="filterAttendance()">
+                        <option value="">All Grades</option>
+                        <option value="Grade 7">Grade 7</option>
+                        <option value="Grade 8">Grade 8</option>
+                        <option value="Grade 9">Grade 9</option>
+                        <option value="Grade 10">Grade 10</option>
+                    </select>
+                </div>
+                <div class="search-wrapper">
+                    <input type="text" id="filterSearch" class="search-input" placeholder="Search by name or RFID..."
+                        oninput="filterAttendance()">
+                </div>
+            </div>
+
+            <!-- Attendance Table -->
+            <div class="glass-card" style="padding: 0; overflow: hidden;">
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>RFID No.</th>
+                                <th>Student Name</th>
+                                <th>Grade</th>
+                                <th>Date</th>
+                                <th>Time In</th>
+                                <th>Time Out</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceBody">
+                            <tr>
+                                <td colspan="7" class="text-center text-muted" style="padding:32px">
+                                    No attendance records found.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="assets/js/script.js?v=2"></script>
+</body>
+
+</html>
