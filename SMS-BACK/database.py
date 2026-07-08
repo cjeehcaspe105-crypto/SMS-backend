@@ -106,15 +106,32 @@ def _fetchall_dict(cursor):
 # ── Schema initialisation ─────────────────────────────────────────────────────
 
 def init_db():
-    """
-    Create all tables (if they don't exist) and seed the admin account and
-    default settings.
-
-    PostgreSQL uses SERIAL / TEXT with compatible syntax.
-    SQLite uses INTEGER PRIMARY KEY AUTOINCREMENT / TEXT.
-    """
     conn = get_db()
     c = conn.cursor()
+    
+    # ... (Keep all your existing CREATE TABLE blocks as they are) ...
+
+    # ── Seed admin ───────────────────────────────────────────────────────────
+    _execute(c, 'SELECT COUNT(*) as count FROM admin')
+    row = c.fetchone()
+    # USE THIS:
+    count = row.get('count', 0) if hasattr(row, 'get') else (row[0] if row else 0)
+    
+    if count == 0:
+        _execute(c, 'INSERT INTO admin (username, password) VALUES (?, ?)', ('admin', 'admin123'))
+
+    # ── Seed default settings ────────────────────────────────────────────────
+    _execute(c, 'SELECT COUNT(*) as count FROM settings')
+    row = c.fetchone()
+    # USE THIS:
+    count = row.get('count', 0) if hasattr(row, 'get') else (row[0] if row else 0)
+    
+    if count == 0:
+        default_settings = [...] # Your list here
+        _executemany(c, 'INSERT INTO settings (key, value) VALUES (?, ?)', default_settings)
+
+    conn.commit()
+    conn.close()
 
     if USE_POSTGRES:
         # ── Admin ────────────────────────────────────────────────────────────
