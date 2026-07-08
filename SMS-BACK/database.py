@@ -242,9 +242,15 @@ def init_db():
         ''')
 
     # ── Seed admin ───────────────────────────────────────────────────────────
-    _execute(c, 'SELECT COUNT(*) FROM admin')
+    _execute(c, 'SELECT COUNT(*) as count FROM admin')
     row = c.fetchone()
-    count = row.get('count') or row.get('COUNT(*)') or 0
+    
+    # Use the same robust logic as the settings block
+    if hasattr(row, 'keys'): # It's a dictionary (Postgres)
+        count = row.get('count', 0)
+    else: # It's a tuple (SQLite)
+        count = row[0] if row else 0
+        
     if count == 0:
         _execute(c,
             'INSERT INTO admin (username, password) VALUES (?, ?)',
@@ -285,7 +291,7 @@ def init_db():
         count = row[0] if row else 0
         
     if count == 0:
-        
+
      if count == 0:
         default_settings = [
             ('adminName',       'System Administrator'),
