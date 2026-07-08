@@ -65,13 +65,18 @@ def login():
             c.execute('SELECT * FROM admin WHERE username=%s', (data.get('username'),))
         else:
             c.execute('SELECT * FROM admin WHERE username=?', (data.get('username'),))
-        admin = make_dict(c.fetchone())
-    finally:
+        row = c.fetchone()
+        admin = make_dict(row)
         conn.close()
+        
+        if admin and admin['password'] == data.get('password'):
+            return jsonify({"success": True, "token": "dummy-token-123", "role": "admin"})
+        return jsonify({"success": False, "message": "Invalid credentials"}), 401
+    except Exception as e:
+        if conn:
+            conn.close()
+        return jsonify({"success": False, "error": str(e)}), 500
 
-    if admin and admin['password'] == data.get('password'):
-        return jsonify({"success": True, "token": "dummy-token-123", "role": "admin"})
-    return jsonify({"success": False, "message": "Invalid credentials"}), 401
 
 
 # ── STUDENTS API ──────────────────────────────────────────────────────────────
