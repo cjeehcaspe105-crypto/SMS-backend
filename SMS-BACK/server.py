@@ -87,12 +87,17 @@ def debug_delete(id):
     conn = get_db()
     c = conn.cursor()
     log = []
+    sms_rows = []
+    att_rows = []
+    student_row = None
     try:
         if USE_POSTGRES:
-            c.execute("SELECT COUNT(*) FROM sms_logs WHERE student_id=%s", (id,))
-            sms_before = c.fetchone()[0]
-            c.execute("SELECT COUNT(*) FROM attendance WHERE student_id=%s", (id,))
-            att_before = c.fetchone()[0]
+            c.execute("SELECT * FROM sms_logs WHERE student_id=%s", (id,))
+            sms_rows = [make_dict(r) for r in c.fetchall()]
+            c.execute("SELECT * FROM attendance WHERE student_id=%s", (id,))
+            att_rows = [make_dict(r) for r in c.fetchall()]
+            c.execute("SELECT * FROM students WHERE id=%s", (id,))
+            student_row = make_dict(c.fetchone())
             
             log.append("Deleting from sms_logs...")
             c.execute("DELETE FROM sms_logs WHERE student_id=%s", (id,))
@@ -101,10 +106,12 @@ def debug_delete(id):
             log.append("Deleting from students...")
             c.execute("DELETE FROM students WHERE id=%s", (id,))
         else:
-            c.execute("SELECT COUNT(*) FROM sms_logs WHERE student_id=?", (id,))
-            sms_before = c.fetchone()[0]
-            c.execute("SELECT COUNT(*) FROM attendance WHERE student_id=?", (id,))
-            att_before = c.fetchone()[0]
+            c.execute("SELECT * FROM sms_logs WHERE student_id=?", (id,))
+            sms_rows = [make_dict(r) for r in c.fetchall()]
+            c.execute("SELECT * FROM attendance WHERE student_id=?", (id,))
+            att_rows = [make_dict(r) for r in c.fetchall()]
+            c.execute("SELECT * FROM students WHERE id=?", (id,))
+            student_row = make_dict(c.fetchone())
             
             log.append("Deleting from sms_logs...")
             c.execute("DELETE FROM sms_logs WHERE student_id=?", (id,))
@@ -117,18 +124,23 @@ def debug_delete(id):
         return jsonify({
             "success": True, 
             "log": log, 
-            "sms_before": sms_before, 
-            "att_before": att_before
+            "student": student_row,
+            "sms_rows": sms_rows, 
+            "att_rows": att_rows
         })
     except Exception as e:
         conn.rollback()
         return jsonify({
             "success": False, 
             "log": log, 
-            "error": str(e)
+            "error": str(e),
+            "student": student_row,
+            "sms_rows": sms_rows, 
+            "att_rows": att_rows
         }), 500
     finally:
         conn.close()
+
 
 
 # ── AUTH API ──────────────────────────────────────────────────────────────────
