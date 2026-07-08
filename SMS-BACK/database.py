@@ -274,7 +274,30 @@ def init_db():
     conn.close()
     print(f"[DB] Initialised — backend: {'PostgreSQL' if USE_POSTGRES else 'SQLite'}")
 
-
-if __name__ == '__main__':
-    init_db()
-    print("Database initialised successfully.")
+# ── Seed default settings ────────────────────────────────────────────────
+    _execute(c, 'SELECT COUNT(*) as total FROM settings') # Added 'as total' to give it a name
+    row = c.fetchone()
+    
+    # This safely handles both Postgres (dict) and SQLite (tuple)
+    if hasattr(row, 'keys'): # It's a dictionary (Postgres)
+        count = row.get('total', 0)
+    else: # It's a tuple (SQLite)
+        count = row[0] if row else 0
+        
+    if count == 0:
+        
+     if count == 0:
+        default_settings = [
+            ('adminName',       'System Administrator'),
+            ('adminEmail',      'admin@vmc.edu.ph'),
+            ('smsSenderName',   'VMC ALERT'),
+            ('smsTemplateIn',   'Good day! Your child {name} has arrived at Villagers Montessori College at {time}. Thank you.'),
+            ('smsTemplateOut',  'Good day! Your child {name} has left Villagers Montessori College at {time}. Thank you.'),
+            ('scanCooldown',    '30'),
+            ('lateThreshold',   '07:30'),
+            ('schoolStart',     '06:00'),
+            ('schoolEnd',       '18:00'),
+        ]
+        _executemany(c,
+            'INSERT INTO settings (key, value) VALUES (?, ?)',
+            default_settings)
