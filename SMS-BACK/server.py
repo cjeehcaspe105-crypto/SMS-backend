@@ -27,7 +27,7 @@ from database import get_db, init_db, USE_POSTGRES, _execute, _fetchone_dict, _f
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# Always ensure DB tables exist (uses CREATE TABLE IF NOT EXISTS — safe)
+# Always ensure DB tables exist (idempotent) (uses CREATE TABLE IF NOT EXISTS — safe)
 init_db()
 
 
