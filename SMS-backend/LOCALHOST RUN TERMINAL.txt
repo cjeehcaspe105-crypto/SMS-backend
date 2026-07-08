@@ -1,0 +1,2 @@
+cd "C:\Users\Admin\OneDrive\Desktop\CAPSTONE 1"
+& "C:\Users\Admin\AppData\Local\Programs\Python\Python312\python.exe" server.py
