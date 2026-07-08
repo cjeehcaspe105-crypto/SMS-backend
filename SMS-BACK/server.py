@@ -34,9 +34,17 @@ init_db()
 # ── Row → dict helper ─────────────────────────────────────────────────────────
 
 def make_dict(row):
-    """Convert a DB row to a plain dict regardless of backend."""
+    """
+    Convert a DB row to a plain dict regardless of backend.
+    sqlite3.Row: use .keys() — 'dict(row)' is unreliable across Python versions.
+    psycopg2 row / plain dict: fall back to dict().
+    """
     if row is None:
         return None
+    # sqlite3.Row exposes .keys(); use explicit comprehension for safety
+    if hasattr(row, 'keys'):
+        return {k: row[k] for k in row.keys()}
+    # psycopg2 RealDictRow or plain mapping
     return dict(row)
 
 
@@ -58,23 +66,39 @@ def serve_static(path):
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
     conn = get_db()
     c = conn.cursor()
     try:
-        if USE_POSTGRES:
-            c.execute('SELECT * FROM admin WHERE username=%s', (data.get('username'),))
-        else:
-            c.execute('SELECT * FROM admin WHERE username=?', (data.get('username'),))
-        row = c.fetchone()
-        admin = make_dict(row)
-        conn.close()
-        
-        if admin and admin['password'] == data.get('password'):
-            return jsonify({"success": True, "token": "dummy-token-123", "role": "admin"})
-        return jsonify({"success": False, "message": "Invalid credentials"}), 401
-    except Exception as e:
-        if conn:
+        # ── 1. Try admin login ────────────────────────────────────────────────
+        _execute(c, 'SELECT * FROM admin WHERE username=?', (username,))
+        admin = make_dict(c.fetchone())
+        if admin and admin.get('password') == password:
             conn.close()
+            return jsonify({"success": True, "token": "dummy-token-123", "role": "admin"})
+
+        # ── 2. Try parent login (Student ID + parent contact number) ──────────
+        _execute(c, 'SELECT * FROM students WHERE id=?', (username,))
+        student = make_dict(c.fetchone())
+        if student and student.get('parent_contact') == password:
+            conn.close()
+            return jsonify({
+                "success": True,
+                "token": "parent-token-123",
+                "role": "parent",
+                "studentId": student['id']
+            })
+
+        conn.close()
+        return jsonify({"success": False, "message": "Invalid credentials"}), 401
+
+    except Exception as e:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        print(f"[ERROR] login: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 

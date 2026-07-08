@@ -77,19 +77,25 @@ def _executemany(cursor, sql, params_list):
     cursor.executemany(sql, params_list)
 
 
-def _fetchone_dict(cursor):
-    """Return the next row as a plain dict (works for both backends)."""
-    row = cursor.fetchone()
+
+def _row_to_dict(row):
+    """Safely convert any DB row to a plain dict regardless of Python version."""
     if row is None:
         return None
-    if USE_POSTGRES:
-        return dict(row)
-    return dict(row)   # sqlite3.Row also supports dict()
+    # sqlite3.Row and psycopg2 RealDictRow both expose .keys()
+    if hasattr(row, 'keys'):
+        return {k: row[k] for k in row.keys()}
+    # Plain tuple (psycopg2 default cursor) — fall back
+    return dict(row)
+
+
+def _fetchone_dict(cursor):
+    """Return the next row as a plain dict (works for both backends)."""
+    return _row_to_dict(cursor.fetchone())
 
 
 def _fetchall_dict(cursor):
-    rows = cursor.fetchall()
-    return [dict(r) for r in rows]
+    return [_row_to_dict(r) for r in cursor.fetchall()]
 
 
 # ── Schema initialisation ─────────────────────────────────────────────────────
