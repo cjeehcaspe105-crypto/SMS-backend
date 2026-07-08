@@ -244,7 +244,7 @@ def init_db():
     # ── Seed admin ───────────────────────────────────────────────────────────
     _execute(c, 'SELECT COUNT(*) FROM admin')
     row = c.fetchone()
-    count = row[0] if row else 0
+    count = row['your_column_name'] if row else 0
     if count == 0:
         _execute(c,
             'INSERT INTO admin (username, password) VALUES (?, ?)',
