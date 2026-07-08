@@ -82,6 +82,55 @@ def debug_db():
         conn.close()
 
 
+@app.route('/api/debug/delete/<id>', methods=['GET'])
+def debug_delete(id):
+    conn = get_db()
+    c = conn.cursor()
+    log = []
+    try:
+        if USE_POSTGRES:
+            c.execute("SELECT COUNT(*) FROM sms_logs WHERE student_id=%s", (id,))
+            sms_before = c.fetchone()[0]
+            c.execute("SELECT COUNT(*) FROM attendance WHERE student_id=%s", (id,))
+            att_before = c.fetchone()[0]
+            
+            log.append("Deleting from sms_logs...")
+            c.execute("DELETE FROM sms_logs WHERE student_id=%s", (id,))
+            log.append("Deleting from attendance...")
+            c.execute("DELETE FROM attendance WHERE student_id=%s", (id,))
+            log.append("Deleting from students...")
+            c.execute("DELETE FROM students WHERE id=%s", (id,))
+        else:
+            c.execute("SELECT COUNT(*) FROM sms_logs WHERE student_id=?", (id,))
+            sms_before = c.fetchone()[0]
+            c.execute("SELECT COUNT(*) FROM attendance WHERE student_id=?", (id,))
+            att_before = c.fetchone()[0]
+            
+            log.append("Deleting from sms_logs...")
+            c.execute("DELETE FROM sms_logs WHERE student_id=?", (id,))
+            log.append("Deleting from attendance...")
+            c.execute("DELETE FROM attendance WHERE student_id=?", (id,))
+            log.append("Deleting from students...")
+            c.execute("DELETE FROM students WHERE id=?", (id,))
+            
+        conn.commit()
+        return jsonify({
+            "success": True, 
+            "log": log, 
+            "sms_before": sms_before, 
+            "att_before": att_before
+        })
+    except Exception as e:
+        conn.rollback()
+        return jsonify({
+            "success": False, 
+            "log": log, 
+            "error": str(e)
+        }), 500
+    finally:
+        conn.close()
+
+
 # ── AUTH API ──────────────────────────────────────────────────────────────────
 
 @app.route('/api/login', methods=['POST'])
