@@ -69,17 +69,41 @@ def debug_db():
         else:
             c.execute("SELECT name, sql FROM sqlite_master WHERE type='table'")
             tables = [dict(r) for r in c.fetchall()]
-            # Also get row counts for debugging
+            
+            # List all foreign keys
+            fk_query = """
+                SELECT 
+                    m.name AS table_name,
+                    f.[table] AS foreign_table,
+                    f.[from] AS column_name,
+                    f.[to] AS referenced_column
+                FROM 
+                    sqlite_master m
+                JOIN 
+                    pragma_foreign_key_list(m.name) f
+                ORDER BY 
+                    m.name
+            """
+            c.execute(fk_query)
+            foreign_keys = [dict(r) for r in c.fetchall()]
+            
             counts = {}
             for t in tables:
                 name = t['name']
                 c.execute(f"SELECT COUNT(*) FROM {name}")
                 counts[name] = c.fetchone()[0]
-            return jsonify({"backend": "SQLite", "tables": tables, "counts": counts})
+                
+            return jsonify({
+                "backend": "SQLite", 
+                "tables": tables, 
+                "counts": counts,
+                "foreign_keys": foreign_keys
+            })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
+
 
 
 @app.route('/api/debug/delete/<id>', methods=['GET'])
