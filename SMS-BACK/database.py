@@ -45,7 +45,12 @@ def get_db():
     SQLite: opens the local vmc.db with WAL journal mode and FK enforcement.
     """
     if USE_POSTGRES:
-        conn = psycopg2.connect(DATABASE_URL)
+        # RealDictCursor makes every fetchone/fetchall return a dict-like
+        # RealDictRow (has .keys() + row[col_name]) instead of a plain tuple.
+        conn = psycopg2.connect(
+            DATABASE_URL,
+            cursor_factory=psycopg2.extras.RealDictCursor,
+        )
         conn.autocommit = False          # explicit transaction control
         return conn
     else:
