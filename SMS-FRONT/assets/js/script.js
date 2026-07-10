@@ -256,20 +256,111 @@ async function loadRFID() {
     showToast('Cannot connect to server.', 'error');
   }
 
-  // Listen for keyboard-wedge RFID scanner input
+  // Keep the hidden input focused for visual indicator on the scanner page.
+  // Actual keydown handling is done by the global listener (initGlobalRFIDListener).
   const rfidInput = document.getElementById('rfidInput');
-  if (!rfidInput) return;
+  if (rfidInput) {
+    document.addEventListener('click', () => rfidInput.focus());
+    rfidInput.focus();
+  }
+}
 
-  rfidInput.addEventListener('keydown', e => {
+/* ─────────────────────────────────────────────────────────
+   GLOBAL RFID LISTENER
+   Works on ANY admin page — no longer tied to rfid.html.
+   Buffers characters from the keyboard-wedge scanner and
+   fires on Enter, calling the smart server-side endpoint.
+   ───────────────────────────────────────────────────────── */
+function initGlobalRFIDListener() {
+  const role = localStorage.getItem('vmc_role');
+  // Only activate for admin sessions
+  if (role !== 'admin') return;
+
+  let rfidBuffer = '';
+  let bufferTimer = null;
+
+  document.addEventListener('keydown', (e) => {
+    // Ignore keystrokes when the user is typing in a form field
+    const tag = (e.target.tagName || '').toLowerCase();
+    const isEditable = (tag === 'input' && e.target.id !== 'rfidInput')
+                    || tag === 'textarea'
+                    || tag === 'select'
+                    || e.target.isContentEditable;
+    if (isEditable) return;
+
     if (e.key === 'Enter') {
-      const rfid = rfidInput.value.trim();
-      rfidInput.value = '';
-      if (rfid) processRFID(rfid);
+      const code = rfidBuffer.trim();
+      rfidBuffer = '';
+      clearTimeout(bufferTimer);
+      if (code) handleGlobalRFIDScan(code);
+      return;
+    }
+
+    // Accumulate printable characters
+    if (e.key.length === 1) {
+      rfidBuffer += e.key;
+      // Safety: clear buffer if nothing arrives for 500 ms (stale input)
+      clearTimeout(bufferTimer);
+      bufferTimer = setTimeout(() => { rfidBuffer = ''; }, 500);
     }
   });
+}
 
-  document.addEventListener('click', () => rfidInput.focus());
-  rfidInput.focus();
+async function handleGlobalRFIDScan(rfidCode) {
+  const onRfidPage = document.body.dataset.page === 'rfid';
+
+  try {
+    const res = await fetch(`${API_BASE}/attendance/scan/rfid`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rfid: rfidCode })
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      const msg = data.message || data.error || 'Scan failed';
+      if (onRfidPage) {
+        showScanResult('error', '❌', 'Scan Error', msg);
+      }
+      showToast(msg, 'error');
+      return;
+    }
+
+    const { type, status, student } = data;
+    const icon   = type === 'IN' ? '✅' : '🚪';
+    const label  = type === 'IN' ? 'Time In' : 'Time Out';
+    const detail = `${student.grade} | ${student.section} | ${status}`;
+
+    // On the dedicated scanner page: full UI feedback + refresh scan log
+    if (onRfidPage) {
+      showScanResult(
+        type === 'IN' ? 'in' : 'out',
+        icon,
+        `${label} — ${student.name}`,
+        detail
+      );
+
+      // Push the new record into todayScans and refresh the log table
+      todayScans.push({
+        rfid:         student.rfid,
+        student_name: student.name,
+        grade:        student.grade,
+        section:      student.section,
+        type,
+        status,
+        timestamp:    data.timestamp,
+        date:         data.timestamp.split('T')[0]
+      });
+      renderScanLog();
+    }
+
+    // Always show a toast (visible on every page)
+    showToast(`${icon} ${student.name} — ${label} (${status})`, 'success');
+
+  } catch (err) {
+    console.error('Global RFID scan error:', err);
+    showToast('Cannot connect to server.', 'error');
+  }
 }
 
 async function processRFID(rfidCode) {
@@ -1028,11 +1119,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const page = document.body.dataset.page;
 
-  if (page === 'dashboard') loadDashboard();
-  if (page === 'rfid') loadRFID();
-  if (page === 'attendance') loadAttendance();
-  if (page === 'students') loadStudents();
-  if (page === 'sms') loadSms();
-  if (page === 'settings') loadSettings();
+  if (page === 'dashboard')    loadDashboard();
+  if (page === 'rfid')          loadRFID();
+  if (page === 'attendance')    loadAttendance();
+  if (page === 'students')      loadStudents();
+  if (page === 'sms')           loadSms();
+  if (page === 'settings')      loadSettings();
   if (page === 'parent-portal') loadParentPortal();
+
+  // Start the global RFID listener on every admin page
+  // (parent-portal is excluded via role check inside initGlobalRFIDListener)
+  initGlobalRFIDListener();
 });

@@ -317,6 +317,147 @@ def create_scan():
         conn.close()
 
 
+# ── SMART RFID SCAN (page-agnostic) ──────────────────────────────────────────
+@app.route('/api/attendance/scan/rfid', methods=['POST'])
+def smart_rfid_scan():
+    """
+    Accept a raw RFID code and perform ALL scan logic server-side:
+      1. Look up student by rfid
+      2. Determine IN vs OUT from today's attendance rows
+      3. Compute status (On Time / Late) using settings.lateThreshold
+      4. Build SMS message from settings template
+      5. Insert attendance + sms_logs rows in one transaction
+    Returns a rich result so the frontend can display feedback without
+    needing students[], settings{}, or todayScans[] arrays in memory.
+    """
+    data = request.json or {}
+    rfid_code = (data.get('rfid') or '').strip()
+    if not rfid_code:
+        return jsonify({"success": False, "error": "rfid is required"}), 400
+
+    conn = get_db()
+    c = conn.cursor()
+    try:
+        # ── 1. Look up the student ────────────────────────────────────────────
+        _execute(c, 'SELECT * FROM students WHERE rfid=?', (rfid_code,))
+        student = make_dict(c.fetchone())
+        if not student:
+            return jsonify({
+                "success": False,
+                "error": "unknown_rfid",
+                "message": f"No student registered for RFID: {rfid_code}"
+            }), 404
+
+        student_id   = student['id']
+        student_name = student['name']
+        grade        = student['grade']
+        section      = student['section']
+        parent_contact = student.get('parent_contact') or student.get('parentContact', '')
+
+        # ── 2. Read settings (lateThreshold, templates, cooldown) ────────────
+        c.execute('SELECT * FROM settings')
+        raw_settings = {row['key']: row['value'] for row in (make_dict(r) for r in c.fetchall())}
+        late_threshold  = raw_settings.get('lateThreshold',  '07:30')
+        scan_cooldown_s = int(raw_settings.get('scanCooldown', '30'))
+        tpl_in  = raw_settings.get('smsTemplateIn',  'Your child {name} has arrived at {time}.')
+        tpl_out = raw_settings.get('smsTemplateOut', 'Your child {name} has left at {time}.')
+
+        # ── 3. Determine IN vs OUT from today's records ───────────────────────
+        now   = datetime.now(datetime.UTC).replace(tzinfo=None)   # naive UTC
+        today = now.strftime('%Y-%m-%d')
+
+        _execute(c,
+            "SELECT type, timestamp FROM attendance WHERE student_id=? AND date=? ORDER BY timestamp DESC",
+            (student_id, today))
+        today_rows = [make_dict(r) for r in c.fetchall()]
+
+        has_in  = any(r['type'] == 'IN'  for r in today_rows)
+        has_out = any(r['type'] == 'OUT' for r in today_rows)
+
+        if has_in and has_out:
+            return jsonify({
+                "success": False,
+                "error": "already_recorded",
+                "message": f"{student_name} has already scanned IN and OUT today."
+            }), 409
+
+        # ── 4. Cooldown guard (server-side) ───────────────────────────────────
+        if today_rows:
+            last_ts_str = today_rows[0]['timestamp']
+            try:
+                # Handle both 'Z' suffix and offset-naive ISO strings
+                last_ts = datetime.fromisoformat(last_ts_str.replace('Z', '+00:00'))
+                last_ts = last_ts.replace(tzinfo=None)   # compare naive
+                elapsed = (now - last_ts).total_seconds()
+                if elapsed < scan_cooldown_s:
+                    remaining = int(scan_cooldown_s - elapsed)
+                    return jsonify({
+                        "success": False,
+                        "error": "cooldown",
+                        "message": f"Cooldown active. Please wait {remaining}s before scanning again."
+                    }), 429
+            except Exception:
+                pass  # if parsing fails, skip cooldown check
+
+        scan_type = 'OUT' if has_in else 'IN'
+
+        # ── 5. Compute arrival status ─────────────────────────────────────────
+        if scan_type == 'IN':
+            lh, lm = map(int, late_threshold.split(':'))
+            status = 'Late' if (now.hour > lh or (now.hour == lh and now.minute > lm)) else 'On Time'
+        else:
+            status = 'Departed'
+
+        # ── 6. Build SMS message ──────────────────────────────────────────────
+        time_str    = now.strftime('%I:%M %p')
+        template    = tpl_in if scan_type == 'IN' else tpl_out
+        sms_message = template.replace('{name}', student_name).replace('{time}', time_str)
+
+        # ── 7. Insert records ─────────────────────────────────────────────────
+        att_id  = 'ATT' + str(int(now.timestamp() * 1000))
+        sms_id  = 'SMS' + str(int(now.timestamp() * 1000) + 1)
+        ts_iso  = now.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+        _execute(c, '''
+            INSERT INTO attendance
+                (id, student_id, rfid, student_name, grade, section, type, status, timestamp, date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (att_id, student_id, rfid_code, student_name, grade, section,
+              scan_type, status, ts_iso, today))
+
+        _execute(c, '''
+            INSERT INTO sms_logs
+                (id, student_id, student_name, parent_contact, message, type, status, timestamp, date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (sms_id, student_id, student_name, parent_contact,
+              sms_message, scan_type, 'Sent', ts_iso, today))
+
+        conn.commit()
+        print(f"[SCAN] {scan_type} — {student_name} ({rfid_code}) @ {ts_iso} [{status}]")
+
+        return jsonify({
+            "success":  True,
+            "type":     scan_type,
+            "status":   status,
+            "student":  {
+                "id":      student_id,
+                "name":    student_name,
+                "grade":   grade,
+                "section": section,
+                "rfid":    rfid_code,
+            },
+            "timestamp": ts_iso,
+            "smsMessage": sms_message
+        })
+
+    except Exception as e:
+        conn.rollback()
+        print(f"[ERROR] smart_rfid_scan: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        conn.close()
+
+
 # ── SMS API ───────────────────────────────────────────────────────────────────
 
 @app.route('/api/sms', methods=['GET'])
