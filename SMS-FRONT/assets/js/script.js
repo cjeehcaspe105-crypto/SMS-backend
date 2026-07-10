@@ -10,7 +10,9 @@
 // Previously this was set to '.../api/students' which caused every call to
 // resolve to a doubly-nested path (.../api/students/students, etc.), breaking
 // auth, RFID scanning, student CRUD, and cross-device sync simultaneously.
-const API_BASE = 'https://sms-backend-ja4y.onrender.com/api';
+const API_BASE = window.location.origin.includes('file://')
+  ? 'https://sms-backend-ja4y.onrender.com/api'
+  : `${window.location.origin}/api`;
 
 /* ─────────────────────────────────────────────────────────
    UTILITY: Toast Notifications
@@ -28,7 +30,7 @@ function showToast(message, type = 'info') {
   toast.className = `toast ${type}`;
   toast.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span>${message}</span>`;
   container.appendChild(toast);
-  setTimeout(() => toast.remove(), 3600);
+  setTimeout(() => toast.remove(), 4000);
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -76,10 +78,15 @@ function guardAuth() {
   }
 }
 
-function logout() {
+async function logout() {
   sessionStorage.removeItem('vmc_token');
   sessionStorage.removeItem('vmc_role');
   sessionStorage.removeItem('vmc_student_id');
+  try {
+    await fetch(`${API_BASE}/logout`, { method: 'POST' });
+  } catch (err) {
+    console.error('Logout error:', err);
+  }
   window.location.href = 'index.html';
 }
 

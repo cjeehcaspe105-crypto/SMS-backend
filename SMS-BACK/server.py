@@ -19,13 +19,14 @@ import json
 from datetime import datetime, timezone
 
 # pyrefly: ignore [missing-import]
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session, redirect
 from flask_cors import CORS
 
 from database import get_db, init_db, USE_POSTGRES, _execute, _fetchone_dict, _fetchall_dict
 
-app = Flask(__name__, static_folder='.', static_url_path='')
-CORS(app)
+app = Flask(__name__, static_folder=None)
+app.secret_key = 'vmc-attendance-secret-key-capstone-4th-semester'
+CORS(app, supports_credentials=True)
 
 # Always ensure DB tables exist (idempotent) (uses CREATE TABLE IF NOT EXISTS — safe)
 init_db()
@@ -52,12 +53,26 @@ def make_dict(row):
 
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html')
+    return send_from_directory('../SMS-FRONT', 'index.html')
 
 
 @app.route('/<path:path>')
 def serve_static(path):
-    return send_from_directory('.', path)
+    # Enforce role-based session verification for HTML page requests
+    if path.endswith('.html'):
+        if path in ['index.html', 'final capstone.html']:
+            return send_from_directory('../SMS-FRONT', path)
+            
+        role = session.get('role')
+        if not role:
+            return redirect('/')
+            
+        if role == 'parent' and path != 'parent-portal.html':
+            return redirect('/parent-portal.html')
+        if role == 'admin' and path == 'parent-portal.html':
+            return redirect('/dashboard.html')
+
+    return send_from_directory('../SMS-FRONT', path)
 
 
 # ── AUTH API ──────────────────────────────────────────────────────────────────
@@ -76,6 +91,10 @@ def login():
         admin = make_dict(c.fetchone())
         if admin and admin.get('password') == password:
             conn.close()
+            session.clear()
+            session['role'] = 'admin'
+            session['token'] = 'dummy-token-123'
+            session.permanent = True
             return jsonify({"success": True, "token": "dummy-token-123", "role": "admin"})
 
         # ── 2. Try parent login (Student ID + parent contact number) ──────────
@@ -83,6 +102,11 @@ def login():
         student = make_dict(c.fetchone())
         if student and student.get('parent_contact') == password:
             conn.close()
+            session.clear()
+            session['role'] = 'parent'
+            session['token'] = 'parent-token-123'
+            session['student_id'] = student['id']
+            session.permanent = True
             return jsonify({
                 "success": True,
                 "token": "parent-token-123",
@@ -100,6 +124,13 @@ def login():
             pass
         print(f"[ERROR] login: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/logout', methods=['POST', 'GET'])
+@app.route('/logout', methods=['POST', 'GET'])
+def logout_session():
+    session.clear()
+    return jsonify({"success": True})
 
 
 
