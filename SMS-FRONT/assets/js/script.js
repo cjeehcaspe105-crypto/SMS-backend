@@ -846,7 +846,7 @@ async function loadParentPortal() {
       return;
     }
 
-    const { student, attendance } = data;
+    const { student, attendance, sms_logs } = data;
 
     // Fill parent metadata
     const initials = student.parentName ? student.parentName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'PC';
@@ -858,70 +858,100 @@ async function loadParentPortal() {
 
     const detailsEl = document.getElementById('parentPortalDetails');
     if (detailsEl) {
-      detailsEl.textContent = `Contact: ${student.parentContact || '—'} • Student Linked: ${student.name} (${student.id})`;
+      detailsEl.textContent = `Contact: ${student.parentContact || '—'} • Linked ID: ${student.id}`;
     }
 
-    // Render child card and attendance history
+    // Populate quick child info panel in welcome banner
+    const childQuickInfoEl = document.getElementById('childQuickInfo');
+    if (childQuickInfoEl) {
+      childQuickInfoEl.innerHTML = `
+        <p style="margin:0; font-size:0.8rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Student Linked</p>
+        <strong style="color:var(--text-primary); font-size:1.1rem; display:block; margin:4px 0 2px 0;">${student.name}</strong>
+        <span class="badge badge-blue" style="font-size:0.75rem">${student.grade} - ${student.section}</span>
+      `;
+    }
+
+    // Group attendance by date
+    const grouped = {};
+    attendance.forEach(r => {
+      if (!grouped[r.date]) {
+        grouped[r.date] = { date: r.date, timeIn: null, timeOut: null, status: '—' };
+      }
+      if (r.type === 'IN') {
+        grouped[r.date].timeIn = r.timestamp;
+        grouped[r.date].status = r.status;
+      }
+      if (r.type === 'OUT') {
+        grouped[r.date].timeOut = r.timestamp;
+      }
+    });
+
+    const sortedHistory = Object.values(grouped).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Calculate metrics for stats
+    const daysPresent = Object.keys(grouped).filter(date => {
+      const day = grouped[date];
+      return day.timeIn !== null || day.timeOut !== null;
+    }).length;
+
+    const lates = Object.values(grouped).filter(h => h.status === 'Late').length;
+    const totalSms = sms_logs ? sms_logs.length : 0;
+    
+    // Monthly academic target basis (22 school days)
+    const targetDays = 22;
+    const attendanceRate = daysPresent > 0 ? Math.min(Math.round((daysPresent / targetDays) * 100), 100) : 0;
+
+    // Populate stat counters
+    const presentCountEl = document.getElementById('parentPresentCount');
+    if (presentCountEl) presentCountEl.textContent = daysPresent;
+
+    const rateEl = document.getElementById('parentAttendanceRate');
+    if (rateEl) rateEl.textContent = `${attendanceRate}%`;
+
+    const lateCountEl = document.getElementById('parentLateCount');
+    if (lateCountEl) {
+      lateCountEl.textContent = lates;
+      // Alert style if lates exist
+      const parentCard = lateCountEl.closest('.stat-card');
+      if (parentCard) {
+        if (lates > 0) {
+          parentCard.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        } else {
+          parentCard.style.borderColor = 'var(--border)';
+        }
+      }
+    }
+
+    const smsCountEl = document.getElementById('parentSmsCount');
+    if (smsCountEl) smsCountEl.textContent = totalSms;
+
+    // Render Daily Attendance Logs Table
     const container = document.getElementById('childrenContainer');
     if (container) {
       if (!attendance || attendance.length === 0) {
         container.innerHTML = `
-          <div class="child-card glass-card" style="padding: 24px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:12px; margin-bottom:16px;">
-              <div>
-                <h3 style="font-size:1.15rem; font-weight:700; margin:0; color:var(--text-main);">${student.name}</h3>
-                <p style="font-size:0.85rem; color:var(--text-muted); margin:4px 0 0 0">${student.grade} | ${student.section} | RFID: ${student.rfid}</p>
-              </div>
-            </div>
-            <p class="text-muted text-center" style="padding: 24px 0;">No attendance records found yet.</p>
+          <div style="padding: 40px 0; text-align: center;">
+            <p class="text-muted">No attendance logs found for this student.</p>
           </div>
         `;
-        return;
-      }
+      } else {
+        const tableRows = sortedHistory.map(h => {
+          const timeInStr = h.timeIn ? new Date(h.timeIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+          const timeOutStr = h.timeOut ? new Date(h.timeOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
 
-      // Group attendance by date for this child
-      const grouped = {};
-      attendance.forEach(r => {
-        if (!grouped[r.date]) {
-          grouped[r.date] = { date: r.date, timeIn: null, timeOut: null, status: '—' };
-        }
-        if (r.type === 'IN') {
-          grouped[r.date].timeIn = r.timestamp;
-          grouped[r.date].status = r.status;
-        }
-        if (r.type === 'OUT') {
-          grouped[r.date].timeOut = r.timestamp;
-        }
-      });
+          return `
+            <tr>
+              <td style="font-weight: 500;">${h.date}</td>
+              <td style="color: var(--accent-green); font-weight: 500;">${timeInStr}</td>
+              <td style="color: var(--accent-blue); font-weight: 500;">${timeOutStr}</td>
+              <td><span class="badge ${statusBadge(h.status)}">${h.status}</span></td>
+            </tr>
+          `;
+        }).join('');
 
-      const sortedHistory = Object.values(grouped).sort((a, b) => new Date(b.date) - new Date(a.date));
-
-      const tableRows = sortedHistory.map(h => {
-        const timeInStr = h.timeIn ? new Date(h.timeIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-        const timeOutStr = h.timeOut ? new Date(h.timeOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-
-        return `
-          <tr>
-            <td>${h.date}</td>
-            <td>${timeInStr}</td>
-            <td>${timeOutStr}</td>
-            <td><span class="badge ${statusBadge(h.status)}">${h.status}</span></td>
-          </tr>
-        `;
-      }).join('');
-
-      container.innerHTML = `
-        <div class="child-card glass-card" style="padding: 24px; overflow: hidden;">
-          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:12px; margin-bottom:16px;">
-            <div>
-              <h3 style="font-size:1.15rem; font-weight:700; margin:0; color:var(--text-main);">${student.name}</h3>
-              <p style="font-size:0.85rem; color:var(--text-muted); margin:4px 0 0 0">${student.grade} | ${student.section} | RFID: ${student.rfid}</p>
-            </div>
-            <span class="badge badge-green" style="font-size:0.75rem">Enrolled</span>
-          </div>
-          
+        container.innerHTML = `
           <div style="overflow-x: auto;">
-            <table class="data-table" style="margin-top: 8px;">
+            <table class="data-table" style="width: 100%;">
               <thead>
                 <tr>
                   <th>Date</th>
@@ -935,9 +965,42 @@ async function loadParentPortal() {
               </tbody>
             </table>
           </div>
-        </div>
-      `;
+        `;
+      }
     }
+
+    // Render SMS Alerts history feed
+    const smsContainer = document.getElementById('smsAlertsContainer');
+    if (smsContainer) {
+      if (!sms_logs || sms_logs.length === 0) {
+        smsContainer.innerHTML = `
+          <div style="padding: 40px 0; text-align: center;">
+            <p class="text-muted" style="font-size: 0.8rem;">No SMS logs found for this student.</p>
+          </div>
+        `;
+      } else {
+        const smsFeedHTML = sms_logs.map(log => {
+          const timeStr = new Date(log.timestamp).toLocaleString([], { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+          const isSent = log.status === 'Sent';
+          const dotClass = isSent ? 'in' : 'out';
+          return `
+            <div class="activity-item" style="padding: 12px; margin-bottom: 8px; display: flex; gap: 12px; background: rgba(255,255,255,0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.03);">
+              <div class="activity-dot ${dotClass}" style="margin-top: 4px;"></div>
+              <div style="flex-grow: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-primary);">${log.type} ALERT</span>
+                  <span style="font-size: 0.7rem; font-weight: 600; color: ${isSent ? 'var(--accent-green)' : 'var(--accent-red)'}">${log.status}</span>
+                </div>
+                <p style="margin: 6px 0; font-size: 0.8rem; line-height: 1.4; color: var(--text-secondary);">${log.message}</p>
+                <span class="activity-time" style="font-size: 0.72rem; color: var(--text-muted);">${timeStr}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+        smsContainer.innerHTML = smsFeedHTML;
+      }
+    }
+
   } catch (err) {
     console.error('Parent portal load error:', err);
     showToast('Failed to connect to the server.', 'error');

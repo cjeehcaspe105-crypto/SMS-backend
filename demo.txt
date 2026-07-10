@@ -1,0 +1,6 @@
+Student ID: DEMO002 / Parent Contact (Password): 09171000002
+Student ID: DEMO003 / Parent Contact (Password): 09171000003
+Student ID: DEMO004 / Parent Contact (Password): 09171000004
+Student ID: DEMO005 / Parent Contact (Password): 09171000005
+Student ID: STU1783694318396 / Parent Contact (Password): 09972000158 (Your custom student CJ)
+Student ID: STU1783694123289 / Parent Contact (Password): 09945064136 (Your custom student Erica Buising)

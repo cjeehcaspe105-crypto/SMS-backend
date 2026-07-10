@@ -465,6 +465,12 @@ def parent_portal_data(student_id):
         else:
             c.execute('SELECT * FROM attendance WHERE student_id=? ORDER BY timestamp DESC', (student_id,))
         attendance = [make_dict(r) for r in c.fetchall()]
+
+        if USE_POSTGRES:
+            c.execute('SELECT * FROM sms_logs WHERE student_id=%s ORDER BY timestamp DESC', (student_id,))
+        else:
+            c.execute('SELECT * FROM sms_logs WHERE student_id=? ORDER BY timestamp DESC', (student_id,))
+        sms_logs = [make_dict(r) for r in c.fetchall()]
     finally:
         conn.close()
 
@@ -472,7 +478,16 @@ def parent_portal_data(student_id):
         r['studentId']   = r.get('student_id', '')
         r['studentName'] = r.get('student_name', '')
 
-    return jsonify({"success": True, "student": student, "attendance": attendance})
+    for l in sms_logs:
+        l['studentId']   = l.get('student_id', '')
+        l['studentName'] = l.get('student_name', '')
+
+    return jsonify({
+        "success": True,
+        "student": student,
+        "attendance": attendance,
+        "sms_logs": sms_logs
+    })
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

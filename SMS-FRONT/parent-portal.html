@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Parent Portal | VMC Attendance System</title>
     <meta name="description"
-        content="Parent Portal – View your child's attendance records including Time In and Time Out.">
+        content="Parent Portal – View your child's attendance records, stats, and real-time SMS logs.">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -20,36 +20,122 @@
         </div>
         <div class="nav-right">
             <span class="live-clock" id="liveClock">--:--:-- --</span>
-            <a href="index.html" class="btn btn-outline btn-sm">🚪 Logout</a>
+            <a href="index.html" class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px;">
+                <span>🚪</span> Logout
+            </a>
         </div>
     </nav>
 
-    <main style="max-width: 900px; margin: 0 auto; padding: 32px 20px; position: relative; z-index: 1;">
-        <!-- Parent Info Card -->
-        <div class="glass-card" style="margin-bottom: 28px;">
-            <div style="display: flex; align-items: center; gap: 20px;">
-                <div id="parentPortalAvatar"
-                    style="width: 60px; height: 60px; background: var(--accent-gradient); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; color: white;">
-                    PC
+    <main style="max-width: 1200px; margin: 0 auto; padding: 90px 24px 40px 24px; position: relative; z-index: 1;">
+        
+        <!-- Welcome banner & Student Details Card -->
+        <div class="glass-card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(22, 27, 39, 0.9) 0%, rgba(108, 99, 255, 0.1) 100%); border: 1px solid rgba(108, 99, 255, 0.2);">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div id="parentPortalAvatar"
+                        style="width: 70px; height: 70px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; color: white; box-shadow: 0 0 20px rgba(108, 99, 255, 0.25);">
+                        PC
+                    </div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <h2 style="font-size: 1.4rem; font-weight: 800; margin: 0;" id="parentPortalName">Parent Portal</h2>
+                            <span class="badge badge-green">Connected</span>
+                        </div>
+                        <p class="text-secondary" style="font-size: 0.9rem; margin-top: 6px;" id="parentPortalDetails">Loading parent information...</p>
+                    </div>
                 </div>
-                <div>
-                    <h2 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px;" id="parentPortalName">Parent
-                        Portal</h2>
-                    <p class="text-secondary" style="font-size: 0.85rem;" id="parentPortalDetails">Loading parent
-                        information...</p>
+                <div style="text-align: right;" id="childQuickInfo">
+                    <!-- Quick child info (grade / section / ID) -->
                 </div>
             </div>
         </div>
 
-        <h2 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 20px;">📚 Enrolled Children – Attendance History
-        </h2>
-
-        <div id="childrenContainer">
-            <!-- Populated by JS -->
-            <div class="child-card">
-                <div class="text-center text-muted" style="padding: 20px;">Loading attendance records...</div>
+        <!-- Stats Overview Cards -->
+        <div class="grid-4" style="margin-bottom: 32px;" id="parentStatsContainer">
+            <div class="stat-card green">
+                <div class="stat-icon">📅</div>
+                <div class="stat-label">Days Present</div>
+                <div class="stat-value" id="parentPresentCount">0</div>
+            </div>
+            <div class="stat-card purple">
+                <div class="stat-icon">📈</div>
+                <div class="stat-label">Attendance Rate</div>
+                <div class="stat-value" id="parentAttendanceRate">0%</div>
+            </div>
+            <div class="stat-card red">
+                <div class="stat-icon">⏰</div>
+                <div class="stat-label">Late Arrivals</div>
+                <div class="stat-value" id="parentLateCount">0</div>
+            </div>
+            <div class="stat-card blue">
+                <div class="stat-icon">💬</div>
+                <div class="stat-label">SMS Alerts Sent</div>
+                <div class="stat-value" id="parentSmsCount">0</div>
             </div>
         </div>
+
+        <!-- Main Section: Two Column Grid -->
+        <div style="display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 24px;" id="parentPortalContent">
+            
+            <!-- Left Side: Attendance History Report -->
+            <div>
+                <div class="glass-card" style="padding: 24px; min-height: 450px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">
+                        <div>
+                            <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                                <span>📋</span> Daily Attendance Logs
+                            </h3>
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">Comprehensive log of your child's scan activities</p>
+                        </div>
+                    </div>
+                    
+                    <div id="childrenContainer">
+                        <div class="text-center text-muted" style="padding: 40px 0;">
+                            <p>Loading attendance history records...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Side: SMS Notifications Received -->
+            <div>
+                <div class="glass-card" style="padding: 24px; min-height: 450px; display: flex; flex-direction: column;">
+                    <div style="margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">
+                        <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                            <span>💬</span> SMS Alert Log
+                        </h3>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">Messages sent to your registered mobile number</p>
+                    </div>
+                    
+                    <div style="flex-grow: 1; overflow-y: auto; max-height: 380px; padding-right: 4px;" id="smsAlertsContainer">
+                        <p class="text-muted text-center" style="padding: 40px 0;">Loading SMS log history...</p>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- Help & Information Panel -->
+        <div class="glass-card" style="margin-top: 24px; border-color: rgba(255,255,255,0.05); background: rgba(22, 27, 39, 0.4);">
+            <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                <span>💡</span> Parent Portal Information Guide
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5;">
+                <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.02);">
+                    <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">📡 Real-Time Tracking</strong>
+                    Every time your child taps their RFID badge at the entrance/exit terminals, the timestamp is immediately updated here and an SMS alert is broadcasted.
+                </div>
+                <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.02);">
+                    <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">❓ Attendance Status Codes</strong>
+                    <span style="color: var(--accent-green);">On Time</span> indicates arrival before classes begin. <span style="color: var(--accent-orange);">Late</span> indicates check-in after the grace threshold.
+                </div>
+                <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.02);">
+                    <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">📞 Profile Updates</strong>
+                    If you change your mobile number or notice incorrect contact details, please notify the registrar's office immediately to update your notification routing.
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <script src="assets/js/script.js?v=2"></script>
