@@ -62,8 +62,8 @@ function startClock() {
 function guardAuth() {
   const page = document.body.dataset.page;
   if (page === 'login') return;
-  const token = localStorage.getItem('vmc_token');
-  const role = localStorage.getItem('vmc_role');
+  const token = sessionStorage.getItem('vmc_token');
+  const role = sessionStorage.getItem('vmc_role');
   if (!token) {
     window.location.href = 'index.html';
     return;
@@ -77,9 +77,9 @@ function guardAuth() {
 }
 
 function logout() {
-  localStorage.removeItem('vmc_token');
-  localStorage.removeItem('vmc_role');
-  localStorage.removeItem('vmc_student_id');
+  sessionStorage.removeItem('vmc_token');
+  sessionStorage.removeItem('vmc_role');
+  sessionStorage.removeItem('vmc_student_id');
   window.location.href = 'index.html';
 }
 
@@ -103,10 +103,10 @@ async function handleLogin(e) {
     });
     const data = await res.json();
     if (data.success) {
-      localStorage.setItem('vmc_token', data.token);
-      localStorage.setItem('vmc_role', data.role);
+      sessionStorage.setItem('vmc_token', data.token);
+      sessionStorage.setItem('vmc_role', data.role);
       if (data.role === 'parent') {
-        localStorage.setItem('vmc_student_id', data.studentId);
+        sessionStorage.setItem('vmc_student_id', data.studentId);
         window.location.href = 'parent-portal.html';
       } else {
         window.location.href = 'dashboard.html';
@@ -272,7 +272,7 @@ async function loadRFID() {
    fires on Enter, calling the smart server-side endpoint.
    ───────────────────────────────────────────────────────── */
 function initGlobalRFIDListener() {
-  const role = localStorage.getItem('vmc_role');
+  const role = sessionStorage.getItem('vmc_role');
   // Only activate for admin sessions
   if (role !== 'admin') return;
 
@@ -923,7 +923,7 @@ async function clearAllData() {
    PARENT PORTAL PAGE
    ───────────────────────────────────────────────────────── */
 async function loadParentPortal() {
-  const studentId = localStorage.getItem('vmc_student_id');
+  const studentId = sessionStorage.getItem('vmc_student_id');
   if (!studentId) {
     logout();
     return;
