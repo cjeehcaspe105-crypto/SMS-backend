@@ -105,33 +105,24 @@ def _fetchall_dict(cursor):
 
 # ── Schema initialisation ─────────────────────────────────────────────────────
 
+def _get_count(row):
+    """
+    Safely extract a count from a database row.
+    Supports both Postgres (RealDictRow) and SQLite (Row/tuple).
+    Expects the SQL query to use 'as count'.
+    """
+    if row is None:
+        return 0
+    if hasattr(row, 'keys'):
+        if 'count' in row.keys():
+            return row['count']
+        return row[0] if len(row) > 0 else 0
+    return row[0] if len(row) > 0 else 0
+
+
 def init_db():
     conn = get_db()
     c = conn.cursor()
-    
-    # ... (Keep all your existing CREATE TABLE blocks as they are) ...
-
-    # ── Seed admin ───────────────────────────────────────────────────────────
-    _execute(c, 'SELECT COUNT(*) as count FROM admin')
-    row = c.fetchone()
-    # USE THIS:
-    count = row.get('count', 0) if hasattr(row, 'get') else (row[0] if row else 0)
-    
-    if count == 0:
-        _execute(c, 'INSERT INTO admin (username, password) VALUES (?, ?)', ('admin', 'admin123'))
-
-    # ── Seed default settings ────────────────────────────────────────────────
-    _execute(c, 'SELECT COUNT(*) as count FROM settings')
-    row = c.fetchone()
-    # USE THIS:
-    count = row.get('count', 0) if hasattr(row, 'get') else (row[0] if row else 0)
-    
-    if count == 0:
-        default_settings = [...] # Your list here
-        _executemany(c, 'INSERT INTO settings (key, value) VALUES (?, ?)', default_settings)
-
-    conn.commit()
-    conn.close()
 
     if USE_POSTGRES:
         # ── Admin ────────────────────────────────────────────────────────────
@@ -166,7 +157,7 @@ def init_db():
                 student_name TEXT NOT NULL,
                 grade        TEXT NOT NULL,
                 section      TEXT NOT NULL,
-                type         TEXT NOT NULL CHECK(type IN (\'IN\', \'OUT\')),
+                type         TEXT NOT NULL CHECK(type IN ('IN', 'OUT')),
                 status       TEXT NOT NULL,
                 timestamp    TEXT NOT NULL,
                 date         TEXT NOT NULL,
@@ -182,7 +173,7 @@ def init_db():
                 student_name   TEXT NOT NULL,
                 parent_contact TEXT NOT NULL,
                 message        TEXT NOT NULL,
-                type           TEXT NOT NULL CHECK(type IN (\'IN\', \'OUT\')),
+                type           TEXT NOT NULL CHECK(type IN ('IN', 'OUT')),
                 status         TEXT NOT NULL,
                 timestamp      TEXT NOT NULL,
                 date           TEXT NOT NULL,
@@ -261,22 +252,16 @@ def init_db():
     # ── Seed admin ───────────────────────────────────────────────────────────
     _execute(c, 'SELECT COUNT(*) as count FROM admin')
     row = c.fetchone()
-    
-    # Use the same robust logic as the settings block
-    if hasattr(row, 'keys'): # It's a dictionary (Postgres)
-        count = row.get('count', 0)
-    else: # It's a tuple (SQLite)
-        count = row[0] if row else 0
-        
+    count = _get_count(row)
     if count == 0:
         _execute(c,
             'INSERT INTO admin (username, password) VALUES (?, ?)',
             ('admin', 'admin123'))
 
     # ── Seed default settings ────────────────────────────────────────────────
-    _execute(c, 'SELECT COUNT(*) FROM settings')
+    _execute(c, 'SELECT COUNT(*) as count FROM settings')
     row = c.fetchone()
-    count = row[0] if row else 0
+    count = _get_count(row)
     if count == 0:
         default_settings = [
             ('adminName',       'System Administrator'),
@@ -297,30 +282,3 @@ def init_db():
     conn.close()
     print(f"[DB] Initialised — backend: {'PostgreSQL' if USE_POSTGRES else 'SQLite'}")
 
-# ── Seed default settings ────────────────────────────────────────────────
-    _execute(c, 'SELECT COUNT(*) as total FROM settings') # Added 'as total' to give it a name
-    row = c.fetchone()
-    
-    # This safely handles both Postgres (dict) and SQLite (tuple)
-    if hasattr(row, 'keys'): # It's a dictionary (Postgres)
-        count = row.get('total', 0)
-    else: # It's a tuple (SQLite)
-        count = row[0] if row else 0
-        
-    if count == 0:
-
-     if count == 0:
-        default_settings = [
-            ('adminName',       'System Administrator'),
-            ('adminEmail',      'admin@vmc.edu.ph'),
-            ('smsSenderName',   'VMC ALERT'),
-            ('smsTemplateIn',   'Good day! Your child {name} has arrived at Villagers Montessori College at {time}. Thank you.'),
-            ('smsTemplateOut',  'Good day! Your child {name} has left Villagers Montessori College at {time}. Thank you.'),
-            ('scanCooldown',    '30'),
-            ('lateThreshold',   '07:30'),
-            ('schoolStart',     '06:00'),
-            ('schoolEnd',       '18:00'),
-        ]
-        _executemany(c,
-            'INSERT INTO settings (key, value) VALUES (?, ?)',
-            default_settings)
