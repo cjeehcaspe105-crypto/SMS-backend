@@ -16,7 +16,7 @@ from datetime import datetime
 
 # Ensure we can import database.py from this directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from database import init_db, get_db
+from database import init_db, get_db, _execute
 
 # ─────────────────────────────────────────────
 # 1. Ensure all tables exist + seed admin/settings
@@ -46,7 +46,7 @@ c = conn.cursor()
 inserted_students = 0
 for s in STUDENTS:
     try:
-        c.execute(
+        _execute(c,
             "INSERT INTO students (id, rfid, name, grade, section, parent_name, parent_contact) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (s["id"], s["rfid"], s["name"], s["grade"], s["section"], s["parentName"], s["parentContact"])
         )
@@ -97,7 +97,7 @@ for date in base_dates:
 inserted_att = 0
 for row in ATTENDANCE:
     try:
-        c.execute(
+        _execute(c,
             "INSERT INTO attendance (id, student_id, rfid, student_name, grade, section, type, status, timestamp, date) VALUES (?,?,?,?,?,?,?,?,?,?)",
             row
         )
@@ -108,7 +108,7 @@ for row in ATTENDANCE:
 inserted_sms = 0
 for row in SMS_LOGS:
     try:
-        c.execute(
+        _execute(c,
             "INSERT INTO sms_logs (id, student_id, student_name, parent_contact, message, type, status, timestamp, date) VALUES (?,?,?,?,?,?,?,?,?)",
             row
         )
