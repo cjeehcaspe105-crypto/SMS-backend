@@ -16,7 +16,7 @@ Key fixes applied (2026-07):
 
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 # pyrefly: ignore [missing-import]
 from flask import Flask, request, jsonify, send_from_directory
@@ -363,7 +363,7 @@ def smart_rfid_scan():
         tpl_out = raw_settings.get('smsTemplateOut', 'Your child {name} has left at {time}.')
 
         # ── 3. Determine IN vs OUT from today's records ───────────────────────
-        now   = datetime.now(datetime.UTC).replace(tzinfo=None)   # naive UTC
+        now   = datetime.now(timezone.utc).replace(tzinfo=None)   # naive UTC, cross-version safe
         today = now.strftime('%Y-%m-%d')
 
         _execute(c,
